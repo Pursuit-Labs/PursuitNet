@@ -3,11 +3,13 @@ import numpy as np
 
 class NN:
     def __init__(self):
-        print("NN initialized")
+        pass
 
     def __del__(self):
-        print("NN deleted")
+        pass
 
     def print_random_number(self):
-        print(f"Random number from pursuitnet.nn: {np.random.rand()}")
+        rand = np.random.rand()
+        print(f"Random number from pursuitnet.nn: {rand}")
+        return rand
 

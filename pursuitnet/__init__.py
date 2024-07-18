@@ -9,5 +9,3 @@ random = Random()
 nn = NN()
 optim = Optim()
 
-print("import pursuitnet")
-

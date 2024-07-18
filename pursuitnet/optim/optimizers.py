@@ -4,10 +4,12 @@ import numpy as np
 
 class Optim:
     def __init__(self):
-        print("Optim initialized")
+        pass
 
     def __del__(self):
-        print("Optim deleted")
+        pass
 
     def print_random_number(self):
-        print(f"Random number from pursuitnet.optim: {np.random.rand()}")
+        rand = np.random.rand()
+        print(f"Random number from pursuitnet.optim: {rand}")
+        return rand
