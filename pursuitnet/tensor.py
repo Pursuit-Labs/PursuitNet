@@ -4,19 +4,26 @@ from . import dtypes
 class Tensor:
     def __init__(self, data, dtype=dtypes.float32, device='cpu'):
         self.device = device
-        self._dtype = dtype
-        self._numpy_dtype = dtype  # This assumes dtype is directly a NumPy dtype, modify if necessary
+        self._pursuitnet_dtype = dtype
         
-        if isinstance(data, Tensor):
+        if hasattr(dtype, 'numpy_dtype'):
+            self._numpy_dtype = dtype.numpy_dtype
+        else:
+            self._numpy_dtype = dtype  # Assume it's already a numpy dtype
+        
+        if data is None:
+            self.data = None
+            self.shape = None
+        elif isinstance(data, Tensor):
             self.data = data.data.astype(self._numpy_dtype)
+            self.shape = self.data.shape
         else:
             self.data = np.array(data, dtype=self._numpy_dtype)
-        
-        self.shape = self.data.shape
+            self.shape = self.data.shape
     
     @property
     def dtype(self):
-        return self._dtype
+        return self._pursuitnet_dtype
 
     def __repr__(self):
         def format_element(x):
@@ -58,9 +65,9 @@ class Tensor:
         if len(self.data.shape) == 1:
             data_str = data_str.replace('\t', '')
 
-        dtype_str = f"pursuitnet.{self._dtype.__name__}"
+        dtype_str = f"pursuitnet.{self._pursuitnet_dtype.__name__}"
 
-        if self._dtype == dtypes.float32 or self._dtype == dtypes.bool:
+        if self._pursuitnet_dtype == dtypes.float32 or self._pursuitnet_dtype == dtypes.bool:
             return f"Tensor({data_str})"
         else:
             return f"Tensor({data_str}, dtype={dtype_str})"
@@ -70,35 +77,35 @@ class Tensor:
 
     def __add__(self, other):
         if isinstance(other, Tensor):
-            return Tensor(np.add(self.data, other.data), dtype=self._dtype, device=self.device)
+            return Tensor(np.add(self.data, other.data), dtype=self._numpy_dtype, device=self.device)
         else:
-            return Tensor(np.add(self.data, other), dtype=self._dtype, device=self.device)
+            return Tensor(np.add(self.data, other), dtype=self._numpy_dtype, device=self.device)
 
     def __sub__(self, other):
         if isinstance(other, Tensor):
-            return Tensor(np.subtract(self.data, other.data), dtype=self._dtype, device=self.device)
+            return Tensor(np.subtract(self.data, other.data), dtype=self._numpy_dtype, device=self.device)
         else:
-            return Tensor(np.subtract(self.data, other), dtype=self._dtype, device=self.device)
+            return Tensor(np.subtract(self.data, other), dtype=self._numpy_dtype, device=self.device)
 
     def __mul__(self, other):
         if isinstance(other, Tensor):
-            return Tensor(np.multiply(self.data, other.data), dtype=self._dtype, device=self.device)
+            return Tensor(np.multiply(self.data, other.data), dtype=self._numpy_dtype, device=self.device)
         else:
-            return Tensor(np.multiply(self.data, other), dtype=self._dtype, device=self.device)
+            return Tensor(np.multiply(self.data, other), dtype=self._numpy_dtype, device=self.device)
 
     def __truediv__(self, other):
         if isinstance(other, Tensor):
-            return Tensor(np.divide(self.data, other.data), dtype=self._dtype, device=self.device)
+            return Tensor(np.divide(self.data, other.data), dtype=self._numpy_dtype, device=self.device)
         else:
-            return Tensor(np.divide(self.data, other), dtype=self._dtype, device=self.device)
+            return Tensor(np.divide(self.data, other), dtype=self._numpy_dtype, device=self.device)
 
     def __matmul__(self, other):
         if not isinstance(other, Tensor):
             raise TypeError("Matrix multiplication is only supported between Tensors")
-        return Tensor(np.matmul(self.data, other.data), dtype=self._dtype, device=self.device)
+        return Tensor(np.matmul(self.data, other.data), dtype=self._numpy_dtype, device=self.device)
 
     def __getitem__(self, key):
-        return Tensor(self.data[key], dtype=self._dtype, device=self.device)
+        return Tensor(self.data[key], dtype=self._numpy_dtype, device=self.device)
 
     def __setitem__(self, key, value):
         self.data[key] = value
@@ -106,34 +113,34 @@ class Tensor:
     def reshape(self, *shape):
         if len(shape) == 1 and isinstance(shape[0], (tuple, list)):
             shape = shape[0]
-        return Tensor(self.data.reshape(shape), dtype=self._dtype, device=self.device)
+        return Tensor(self.data.reshape(shape), dtype=self._numpy_dtype, device=self.device)
 
     def transpose(self, *axes):
         if not axes:
             axes = None
-        return Tensor(np.transpose(self.data, axes), dtype=self._dtype, device=self.device)
+        return Tensor(np.transpose(self.data, axes), dtype=self._numpy_dtype, device=self.device)
 
     def to(self, device):
         if device == self.device:
             return self
         else:
-            return Tensor(self.data, dtype=self._dtype, device=device)
+            return Tensor(self.data, dtype=self._numpy_dtype, device=device)
 
     @property
     def T(self):
         return self.transpose()
 
     def mean(self, axis=None, keepdims=False):
-        return Tensor(np.mean(self.data, axis=axis, keepdims=keepdims), dtype=self._dtype, device=self.device)
+        return Tensor(np.mean(self.data, axis=axis, keepdims=keepdims), dtype=self._numpy_dtype, device=self.device)
 
     def sum(self, axis=None, keepdims=False):
-        return Tensor(np.sum(self.data, axis=axis, keepdims=keepdims), dtype=self._dtype, device=self.device)
+        return Tensor(np.sum(self.data, axis=axis, keepdims=keepdims), dtype=self._numpy_dtype, device=self.device)
 
     def max(self, axis=None, keepdims=False):
-        return Tensor(np.max(self.data, axis=axis, keepdims=keepdims), dtype=self._dtype, device=self.device)
+        return Tensor(np.max(self.data, axis=axis, keepdims=keepdims), dtype=self._numpy_dtype, device=self.device)
 
     def min(self, axis=None, keepdims=False):
-        return Tensor(np.min(self.data, axis=axis, keepdims=keepdims), dtype=self._dtype, device=self.device)
+        return Tensor(np.min(self.data, axis=axis, keepdims=keepdims), dtype=self._numpy_dtype, device=self.device)
 
     @classmethod
     def zeros(cls, *shape, dtype=dtypes.float32, device='cpu'):

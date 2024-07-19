@@ -18,7 +18,7 @@ def gpu_available():
 class TestCPUTensor(unittest.TestCase):
     def setUp(self):
         self.data = [[1, 2], [3, 4]]
-        self.cpu_tensor = pn.Tensor(self.data, dtype=np.float32)
+        self.cpu_tensor = pn.Tensor(self.data, dtype=pn.float32)
 
     def test_creation(self):
         self.assertIsInstance(self.cpu_tensor, pn.Tensor)
