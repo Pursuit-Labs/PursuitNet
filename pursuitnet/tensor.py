@@ -1,4 +1,10 @@
-import numpy as np
+try:
+    import cupy as np
+    HAS_CUPY = True
+except ImportError:
+    import numpy as np
+    HAS_CUPY = False
+    
 from . import dtypes
 
 class Tensor:
@@ -124,7 +130,12 @@ class Tensor:
         if device == self.device:
             return self
         else:
-            return Tensor(self.data, dtype=self._numpy_dtype, device=device)
+            if device == 'cpu' and HAS_CUPY:
+                return Tensor(self.data.get(), dtype=self._numpy_dtype, device=device)
+            elif device == 'gpu' and HAS_CUPY:
+                return Tensor(np.array(self.data), dtype=self._numpy_dtype, device=device)
+            else:
+                return Tensor(self.data, dtype=self._numpy_dtype, device=device)
 
     @property
     def T(self):
