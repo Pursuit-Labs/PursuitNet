@@ -179,6 +179,37 @@ class TestTensorRepr(unittest.TestCase):
         self.assert_repr_match(pn_tensor, pt_tensor)
 
 class TestGradients(unittest.TestCase):
+    def assert_close(self, a, b, rtol=1e-5, atol=1e-8):
+        def to_list(x):
+            if x is None:
+                return None
+            if isinstance(x, pn.Tensor):
+                return x.data.tolist() if x.data is not None else None
+            elif isinstance(x, torch.Tensor):
+                return x.detach().cpu().numpy().tolist()
+            elif isinstance(x, np.ndarray):
+                return x.tolist()
+            else:
+                return list(x)
+
+        a_list = to_list(a)
+        b_list = to_list(b)
+
+        if a_list is None and b_list is None:
+            return
+        
+        self.assertIsNotNone(a_list, "First argument is None")
+        self.assertIsNotNone(b_list, "Second argument is None")
+
+        self.assertEqual(len(a_list), len(b_list), "Arrays have different lengths")
+
+        for a_val, b_val in zip(a_list, b_list):
+            if isinstance(a_val, (list, tuple)) and isinstance(b_val, (list, tuple)):
+                self.assert_close(a_val, b_val, rtol, atol)
+            else:
+                self.assertAlmostEqual(a_val, b_val, delta=max(rtol * abs(b_val), atol),
+                                    msg=f"Values not close: {a_val} != {b_val}")
+                
     def test_requires_grad(self):
         pn_tensor = pn.Tensor([1.0, 2.0, 3.0], requires_grad=True)
         pt_tensor = torch.tensor([1.0, 2.0, 3.0], requires_grad=True)
@@ -203,7 +234,7 @@ class TestGradients(unittest.TestCase):
         pn_result.backward()
         pt_result.backward()
         
-        self.assertTrue(np.allclose(np.array(pn_tensor.grad), pt_tensor.grad.numpy()))
+        self.assert_close(pn_tensor.grad, pt_tensor.grad)
 
     def test_addition_backward(self):
         pn_x = pn.Tensor([1.0, 2.0, 3.0], requires_grad=True)
@@ -217,8 +248,8 @@ class TestGradients(unittest.TestCase):
         pn_z.backward()
         pt_z.backward()
         
-        self.assertTrue(np.allclose(np.array(pn_x.grad), pt_x.grad.numpy()))
-        self.assertTrue(np.allclose(np.array(pn_y.grad), pt_y.grad.numpy()))
+        self.assert_close(pn_x.grad, pt_x.grad)
+        self.assert_close(pn_y.grad, pt_y.grad)
 
     def test_multiplication_backward(self):
         pn_x = pn.Tensor([1.0, 2.0, 3.0], requires_grad=True)
@@ -232,8 +263,8 @@ class TestGradients(unittest.TestCase):
         pn_z.backward()
         pt_z.backward()
         
-        self.assertTrue(np.allclose(pn_x.grad, pt_x.grad.numpy()))
-        self.assertTrue(np.allclose(pn_y.grad, pt_y.grad.numpy()))
+        self.assert_close(pn_x.grad, pt_x.grad)
+        self.assert_close(pn_y.grad, pt_y.grad)
 
     def test_matmul_backward(self):
         pn_x = pn.Tensor([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -247,8 +278,8 @@ class TestGradients(unittest.TestCase):
         pn_z.backward()
         pt_z.backward()
         
-        self.assertTrue(np.allclose(pn_x.grad, pt_x.grad.numpy()))
-        self.assertTrue(np.allclose(pn_y.grad, pt_y.grad.numpy()))
+        self.assert_close(pn_x.grad, pt_x.grad)
+        self.assert_close(pn_y.grad, pt_y.grad)
 
     def test_zero_grad(self):
         pn_tensor = pn.Tensor([1.0, 2.0, 3.0], requires_grad=True)
@@ -264,10 +295,9 @@ class TestGradients(unittest.TestCase):
         self.assertIsNotNone(pt_tensor.grad, "pt_tensor.grad should not be None after backward")
         
         pn_tensor.zero_grad()
-        pt_tensor.grad.zero_()  # This is the correct way to zero gradients in PyTorch
+        pt_tensor.grad.zero_()
         
-        self.assertTrue(np.all(pn_tensor.grad == 0), "pn_tensor.grad should be all zeros after zero_grad")
-        self.assertTrue(torch.all(pt_tensor.grad == 0), "pt_tensor.grad should be all zeros after zero_grad")
+        self.assert_close(pn_tensor.grad, pt_tensor.grad)
 
     def test_complex_computation(self):
         pn_x = pn.Tensor([1.0, 2.0, 3.0], requires_grad=True)
@@ -281,8 +311,8 @@ class TestGradients(unittest.TestCase):
         pn_z.backward()
         pt_z.backward()
         
-        self.assertTrue(np.allclose(pn_x.grad, pt_x.grad.numpy()))
-        self.assertTrue(np.allclose(pn_y.grad, pt_y.grad.numpy()))
+        self.assert_close(pn_x.grad, pt_x.grad)
+        self.assert_close(pn_y.grad, pt_y.grad)
 
 if __name__ == '__main__':
     print(f"Running tests on {platform.system()} {platform.machine()}")
