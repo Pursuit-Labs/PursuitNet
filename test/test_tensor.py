@@ -178,6 +178,112 @@ class TestTensorRepr(unittest.TestCase):
         pt_tensor = torch.tensor(data, dtype=torch.float32)
         self.assert_repr_match(pn_tensor, pt_tensor)
 
+class TestGradients(unittest.TestCase):
+    def test_requires_grad(self):
+        pn_tensor = pn.Tensor([1.0, 2.0, 3.0], requires_grad=True)
+        pt_tensor = torch.tensor([1.0, 2.0, 3.0], requires_grad=True)
+        
+        self.assertTrue(pn_tensor.requires_grad)
+        self.assertTrue(pt_tensor.requires_grad)
+
+    def test_grad_none_initially(self):
+        pn_tensor = pn.Tensor([1.0, 2.0, 3.0], requires_grad=True)
+        pt_tensor = torch.tensor([1.0, 2.0, 3.0], requires_grad=True)
+        
+        self.assertIsNone(pn_tensor.grad)
+        self.assertIsNone(pt_tensor.grad)
+
+    def test_simple_backward(self):
+        pn_tensor = pn.Tensor([1.0, 2.0, 3.0], requires_grad=True)
+        pt_tensor = torch.tensor([1.0, 2.0, 3.0], requires_grad=True)
+        
+        pn_result = pn_tensor.sum()
+        pt_result = pt_tensor.sum()
+        
+        pn_result.backward()
+        pt_result.backward()
+        
+        self.assertTrue(np.allclose(np.array(pn_tensor.grad), pt_tensor.grad.numpy()))
+
+    def test_addition_backward(self):
+        pn_x = pn.Tensor([1.0, 2.0, 3.0], requires_grad=True)
+        pn_y = pn.Tensor([4.0, 5.0, 6.0], requires_grad=True)
+        pt_x = torch.tensor([1.0, 2.0, 3.0], requires_grad=True)
+        pt_y = torch.tensor([4.0, 5.0, 6.0], requires_grad=True)
+        
+        pn_z = (pn_x + pn_y).sum()
+        pt_z = (pt_x + pt_y).sum()
+        
+        pn_z.backward()
+        pt_z.backward()
+        
+        self.assertTrue(np.allclose(np.array(pn_x.grad), pt_x.grad.numpy()))
+        self.assertTrue(np.allclose(np.array(pn_y.grad), pt_y.grad.numpy()))
+
+    def test_multiplication_backward(self):
+        pn_x = pn.Tensor([1.0, 2.0, 3.0], requires_grad=True)
+        pn_y = pn.Tensor([4.0, 5.0, 6.0], requires_grad=True)
+        pt_x = torch.tensor([1.0, 2.0, 3.0], requires_grad=True)
+        pt_y = torch.tensor([4.0, 5.0, 6.0], requires_grad=True)
+        
+        pn_z = (pn_x * pn_y).sum()
+        pt_z = (pt_x * pt_y).sum()
+        
+        pn_z.backward()
+        pt_z.backward()
+        
+        self.assertTrue(np.allclose(pn_x.grad, pt_x.grad.numpy()))
+        self.assertTrue(np.allclose(pn_y.grad, pt_y.grad.numpy()))
+
+    def test_matmul_backward(self):
+        pn_x = pn.Tensor([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+        pn_y = pn.Tensor([[5.0, 6.0], [7.0, 8.0]], requires_grad=True)
+        pt_x = torch.tensor([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+        pt_y = torch.tensor([[5.0, 6.0], [7.0, 8.0]], requires_grad=True)
+        
+        pn_z = (pn_x @ pn_y).sum()
+        pt_z = (pt_x @ pt_y).sum()
+        
+        pn_z.backward()
+        pt_z.backward()
+        
+        self.assertTrue(np.allclose(pn_x.grad, pt_x.grad.numpy()))
+        self.assertTrue(np.allclose(pn_y.grad, pt_y.grad.numpy()))
+
+    def test_zero_grad(self):
+        pn_tensor = pn.Tensor([1.0, 2.0, 3.0], requires_grad=True)
+        pt_tensor = torch.tensor([1.0, 2.0, 3.0], requires_grad=True)
+        
+        pn_result = pn_tensor.sum()
+        pt_result = pt_tensor.sum()
+        
+        pn_result.backward()
+        pt_result.backward()
+        
+        self.assertIsNotNone(pn_tensor.grad, "pn_tensor.grad should not be None after backward")
+        self.assertIsNotNone(pt_tensor.grad, "pt_tensor.grad should not be None after backward")
+        
+        pn_tensor.zero_grad()
+        pt_tensor.grad.zero_()  # This is the correct way to zero gradients in PyTorch
+        
+        self.assertTrue(np.all(pn_tensor.grad == 0), "pn_tensor.grad should be all zeros after zero_grad")
+        self.assertTrue(torch.all(pt_tensor.grad == 0), "pt_tensor.grad should be all zeros after zero_grad")
+
+    def test_complex_computation(self):
+        pn_x = pn.Tensor([1.0, 2.0, 3.0], requires_grad=True)
+        pn_y = pn.Tensor([4.0, 5.0, 6.0], requires_grad=True)
+        pt_x = torch.tensor([1.0, 2.0, 3.0], requires_grad=True)
+        pt_y = torch.tensor([4.0, 5.0, 6.0], requires_grad=True)
+        
+        pn_z = ((pn_x * pn_y).sum() + (pn_x + pn_y).sum()) * pn_x.sum()
+        pt_z = ((pt_x * pt_y).sum() + (pt_x + pt_y).sum()) * pt_x.sum()
+        
+        pn_z.backward()
+        pt_z.backward()
+        
+        self.assertTrue(np.allclose(pn_x.grad, pt_x.grad.numpy()))
+        self.assertTrue(np.allclose(pn_y.grad, pt_y.grad.numpy()))
+
 if __name__ == '__main__':
     print(f"Running tests on {platform.system()} {platform.machine()}")
     print(f"Python version: {sys.version}")
