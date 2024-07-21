@@ -30,7 +30,7 @@ class TestCPUTensor(unittest.TestCase):
         self.assertEqual(self.cpu_tensor.device, 'cpu')
 
     def test_shape(self):
-        self.assertEqual(self.cpu_tensor.shape, (2, 2))
+        self.assertEqual(str(self.cpu_tensor.shape), 'pursuitnet.Size([2, 2])')
 
     def test_indexing(self):
         self.assertEqual(self.cpu_tensor[0, 1].data, 2)
@@ -65,11 +65,11 @@ class TestCPUTensor(unittest.TestCase):
 
     def test_reshape(self):
         reshaped = self.cpu_tensor.reshape((1, 4))
-        self.assertEqual(reshaped.shape, (1, 4))
+        self.assertEqual(str(reshaped.shape), 'pursuitnet.Size([1, 4])')
 
     def test_transpose(self):
         transposed = self.cpu_tensor.transpose()
-        self.assertEqual(transposed.shape, (2, 2))
+        self.assertEqual(str(transposed.shape), 'pursuitnet.Size([2, 2])')
         self.assertTrue(np.array_equal(transposed.data, np.array([[1, 3], [2, 4]])))
 
     def test_matmul(self):
@@ -177,6 +177,24 @@ class TestTensorRepr(unittest.TestCase):
         pn_tensor = pn.Tensor(data, dtype=pn.float32)
         pt_tensor = torch.tensor(data, dtype=torch.float32)
         self.assert_repr_match(pn_tensor, pt_tensor)
+
+class TestTensorSize(unittest.TestCase):
+    def test_tensor_shape(self):
+        data = [[1, 2], [3, 4]]
+        tensor = pn.Tensor(data, dtype=pn.float32)
+        self.assertEqual(str(tensor.shape), 'pursuitnet.Size([2, 2])')
+
+    def test_reshape_tensor(self):
+        data = [[1, 2], [3, 4]]
+        tensor = pn.Tensor(data, dtype=pn.float32)
+        reshaped = tensor.reshape(1, 4)
+        self.assertEqual(str(reshaped.shape), 'pursuitnet.Size([1, 4])')
+
+    def test_transpose_tensor(self):
+        data = [[1, 2], [3, 4]]
+        tensor = pn.Tensor(data, dtype=pn.float32)
+        transposed = tensor.transpose()
+        self.assertEqual(str(transposed.shape), 'pursuitnet.Size([2, 2])')
 
 class TestGradients(unittest.TestCase):
     def assert_close(self, a, b, rtol=1e-5, atol=1e-8):

@@ -7,6 +7,25 @@ except ImportError:
 
 from pursuitnet import dtypes, ops, device_utils, Value, grad_utils
 
+class Size:
+    def __init__(self, shape):
+        self.shape = shape
+    
+    def __repr__(self):
+        return f'pursuitnet.Size({list(self.shape)})'
+    
+    def __str__(self):
+        return self.__repr__()
+    
+    def __iter__(self):
+        return iter(self.shape)
+
+    def __getitem__(self, idx):
+        return self.shape[idx]
+    
+    def __len__(self):
+        return len(self.shape)
+    
 class Tensor:
     def __init__(self, data, dtype=dtypes.float32, device='cpu', requires_grad=False):
         self.device = device
@@ -18,10 +37,10 @@ class Tensor:
             self.shape = None
         elif isinstance(data, Tensor):
             self.data = data.data.astype(self._numpy_dtype)
-            self.shape = self.data.shape
+            self.shape = Size(self.data.shape)
         else:
             self.data = np.array(data, dtype=self._numpy_dtype)
-            self.shape = self.data.shape
+            self.shape = Size(self.data.shape)
         
         self.val = Value(self.data, requires_grad=requires_grad) if requires_grad else None
         self._grad = None
