@@ -2,7 +2,6 @@
 __version__ = '0.1.0'
 
 # Importing main components of the library
-from .random import Random
 from .nn import NN
 from .optim import Optim
 
@@ -13,7 +12,6 @@ from .device import device_utils
 from .autograd import grad_utils, functions, Value
 
 # Initializing main components
-random = Random()
 nn = NN()
 optim = Optim()
 dtype = dtype(None, 'None')
