@@ -2,7 +2,7 @@
 __version__ = '0.1.0'
 
 # Importing main components of the library
-from .nn import NN
+from .rand import Rand
 from .optim import Optim
 
 # Importing dtype, ops, device, and autograd modules
@@ -11,8 +11,10 @@ from .ops import ops
 from .device import device_utils
 from .autograd import grad_utils, functions, Value
 
+from .nn import *
+
 # Initializing main components
-nn = NN()
+rand = Rand()
 optim = Optim()
 dtype = dtype(None, 'None')
 
