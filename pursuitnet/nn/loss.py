@@ -1,47 +1,58 @@
 import numpy as np
-from .module import Module
-import pursuitnet as pn
-from pursuitnet.autograd.function import Function
+from pursuitnet.tensor import Tensor
+from pursuitnet.autograd.value import Value
 
-class CrossEntropyLossFunction(Function):
-    @staticmethod
-    def forward(ctx, input, target):
-        input_data = input.data
-        target_data = target.data.astype(int)
-        
-        assert len(input_data.shape) == 2, "Input must be a 2D array"
-        assert len(target_data.shape) == 1, "Target must be a 1D array"
-        
-        exp_input = np.exp(input_data - np.max(input_data, axis=1, keepdims=True))
-        softmax_output = exp_input / np.sum(exp_input, axis=1, keepdims=True)
-        
-        m = target_data.shape[0]
-        log_likelihood = -np.log(softmax_output[np.arange(m), target_data])
-        loss = np.sum(log_likelihood) / m
-        
-        ctx.save_for_backward(input, target, softmax_output)
-        return pn.Tensor(np.array([loss]), requires_grad=input.requires_grad)
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        input, target, softmax_output = ctx.saved_tensors
-        m = target.shape[0]
-        
-        grad_input = softmax_output.copy()
-        grad_input[np.arange(m), target.data.astype(int)] -= 1
-        grad_input /= m
-        
-        if grad_output is not None:
-            grad_input *= grad_output.data
-
-        return pn.Tensor(grad_input, requires_grad=input.requires_grad), None
-
-class CrossEntropyLoss(Module):
+class CrossEntropyLoss:
     def __init__(self):
-        super(CrossEntropyLoss, self).__init__()
+        self.input = None
+        self.target = None
+        self.output = None
+        self.softmax_output = None
 
-    def forward(self, input, target):
-        return CrossEntropyLossFunction.apply(input, target)
+    def forward(self, input_tensor: Tensor, target: Tensor) -> Tensor:
+        self.input = input_tensor
+        self.target = target
 
-    def __call__(self, input, target):
-        return self.forward(input, target)
+        # Compute softmax
+        exp_input = np.exp(input_tensor.data - np.max(input_tensor.data, axis=1, keepdims=True))
+        self.softmax_output = exp_input / np.sum(exp_input, axis=1, keepdims=True)
+
+        # Compute cross entropy loss
+        batch_size = input_tensor.shape[0]
+        target_indices = target.data.astype(int)  # Ensure target indices are integers
+        loss = -np.sum(np.log(self.softmax_output[range(batch_size), target_indices])) / batch_size
+
+        # Ensure loss is a scalar
+        loss = np.array(loss).reshape(())
+
+        self.output = Tensor(loss, dtype=input_tensor.dtype, device=input_tensor.device, requires_grad=input_tensor.requires_grad)
+
+        if self.output.requires_grad:
+            self.output.val = Value(self.output.data, requires_grad=True)
+            self.output.val.grad_fn = self.backward
+
+        return self.output
+
+    def backward(self, grad_output=None):
+        if grad_output is None:
+            grad_output = 1.0
+
+        batch_size = self.input.shape[0]
+        
+        # Compute cross entropy loss gradients
+        dx = self.softmax_output.copy()
+        target_indices = self.target.data.astype(int)  # Ensure target indices are integers
+        dx[range(batch_size), target_indices] -= 1
+        dx /= batch_size
+
+        # Apply grad_output
+        dx *= grad_output
+
+        if self.input.requires_grad:
+            if self.input.grad is None:
+                self.input.grad = dx
+            else:
+                self.input.grad += dx
+
+    def __call__(self, input_tensor: Tensor, target: Tensor) -> Tensor:
+        return self.forward(input_tensor, target)

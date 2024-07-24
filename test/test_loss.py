@@ -21,19 +21,22 @@ class TestCrossEntropyLoss(unittest.TestCase):
         self.assertTrue(np.allclose(a, b, rtol=rtol, atol=atol))
 
     def test_forward(self):
-        input_data = np.array([[0.9, 0.05, 0.05], [0.1, 0.8, 0.1], [0.2, 0.3, 0.5]], dtype=np.float32)
-        target_data = np.array([0, 1, 2], dtype=np.int64)
-        
+        input_data = np.array([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6], [0.7, 0.8, 0.9]])
+        target_data = np.array([1, 2, 0])
+
         input_tensor_pn = pn.Tensor(input_data, requires_grad=True)
         target_tensor_pn = pn.Tensor(target_data)
-        
+
         input_tensor_torch = torch.tensor(input_data, requires_grad=True)
-        target_tensor_torch = torch.tensor(target_data, dtype=torch.long)
-        
+        target_tensor_torch = torch.tensor(target_data)
+
         loss_pn = self.loss_fn_pn(input_tensor_pn, target_tensor_pn)
         loss_torch = self.loss_fn_torch(input_tensor_torch, target_tensor_torch)
-        
-        self.assertAlmostEqual(loss_pn.data[0], loss_torch.item(), places=6)
+
+        # Convert loss_pn.data to a scalar if it's not already
+        loss_pn_value = loss_pn.data.item() if hasattr(loss_pn.data, 'item') else loss_pn.data
+
+        self.assertAlmostEqual(loss_pn_value, loss_torch.item(), places=6)
 
     def test_backward(self):
         input_data = np.array([[0.9, 0.05, 0.05], [0.1, 0.8, 0.1], [0.2, 0.3, 0.5]], dtype=np.float32)
