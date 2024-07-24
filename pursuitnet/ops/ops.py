@@ -5,77 +5,174 @@ except ImportError:
     import numpy as np
     HAS_CUPY = False
 
-from ..autograd import functions
+from ..autograd import operations
+from pursuitnet.autograd.value import Value
 
 def add(a, b):
-    if isinstance(b, a.__class__):
-        result = a.__class__(np.add(a.data, b.data), dtype=a._pursuitnet_dtype, device=a.device)
-        result.val = functions.Add.apply(a.val, b.val) if (a.val is not None or b.val is not None) else None
-    else:
+    if isinstance(b, (int, float)):
         result = a.__class__(np.add(a.data, b), dtype=a._pursuitnet_dtype, device=a.device)
-        result.val = functions.Add.apply(a.val, b) if a.val is not None else None
+    elif isinstance(b, a.__class__):
+        result = a.__class__(np.add(a.data, b.data), dtype=a._pursuitnet_dtype, device=a.device)
+    else:
+        raise TypeError(f"Unsupported operand type for +: '{type(a).__name__}' and '{type(b).__name__}'")
+
+    if a.requires_grad or (isinstance(b, a.__class__) and b.requires_grad):
+        result.requires_grad = True
+        result.val = Value(result.data, requires_grad=True)
+        def _backward(grad_output):
+            if a.requires_grad:
+                a.backward(grad_output)
+            if isinstance(b, a.__class__) and b.requires_grad:
+                b.backward(grad_output)
+        result.val.grad_fn = _backward
     return result
 
 def mul(a, b):
-    if isinstance(b, a.__class__):
-        result = a.__class__(np.multiply(a.data, b.data), dtype=a._pursuitnet_dtype, device=a.device)
-        result.val = functions.Mul.apply(a.val, b.val) if (a.val is not None or b.val is not None) else None
-    else:
+    if isinstance(b, (int, float)):
         result = a.__class__(np.multiply(a.data, b), dtype=a._pursuitnet_dtype, device=a.device)
-        result.val = functions.Mul.apply(a.val, b) if a.val is not None else None
+    elif isinstance(b, a.__class__):
+        result = a.__class__(np.multiply(a.data, b.data), dtype=a._pursuitnet_dtype, device=a.device)
+    else:
+        raise TypeError(f"Unsupported operand type for *: '{type(a).__name__}' and '{type(b).__name__}'")
+
+    if a.requires_grad or (isinstance(b, a.__class__) and b.requires_grad):
+        result.requires_grad = True
+        result.val = Value(result.data, requires_grad=True)
+        def _backward(grad_output):
+            if a.requires_grad:
+                a.backward(grad_output * (b.data if isinstance(b, a.__class__) else b))
+            if isinstance(b, a.__class__) and b.requires_grad:
+                b.backward(grad_output * a.data)
+        result.val.grad_fn = _backward
     return result
 
 def matmul(a, b):
     if not isinstance(b, a.__class__):
         raise TypeError("Matrix multiplication is only supported between Tensors")
     result = a.__class__(np.matmul(a.data, b.data), dtype=a._pursuitnet_dtype, device=a.device)
-    result.val = functions.MatMul.apply(a.val, b.val) if (a.val is not None or b.val is not None) else None
+    if a.requires_grad or b.requires_grad:
+        result.requires_grad = True
+        result.val = Value(result.data, requires_grad=True)
+        def _backward(grad_output):
+            if a.requires_grad:
+                a.backward(np.matmul(grad_output, b.data.T))
+            if b.requires_grad:
+                b.backward(np.matmul(a.data.T, grad_output))
+        result.val.grad_fn = _backward
     return result
 
 def div(a, b):
     if isinstance(b, a.__class__):
         result = a.__class__(np.divide(a.data, b.data), dtype=a._pursuitnet_dtype, device=a.device)
-        result.val = a.val / b.val if (a.val is not None and b.val is not None) else None
+        if a.requires_grad or b.requires_grad:
+            result.requires_grad = True
+            result.val = Value(result.data, requires_grad=True)
+            def _backward(grad_output):
+                if a.requires_grad:
+                    a.backward(grad_output / b.data)
+                if b.requires_grad:
+                    b.backward(-grad_output * a.data / (b.data ** 2))
+            result.val.grad_fn = _backward
     else:
         result = a.__class__(np.divide(a.data, b), dtype=a._pursuitnet_dtype, device=a.device)
-        result.val = a.val / b if a.val is not None else None
+        if a.requires_grad:
+            result.requires_grad = True
+            result.val = Value(result.data, requires_grad=True)
+            def _backward(grad_output):
+                a.backward(grad_output / b)
+            result.val.grad_fn = _backward
     return result
 
 def sub(a, b):
     if isinstance(b, a.__class__):
         result = a.__class__(np.subtract(a.data, b.data), dtype=a._pursuitnet_dtype, device=a.device)
-        result.val = a.val - b.val if (a.val is not None and b.val is not None) else None
+        if a.requires_grad or b.requires_grad:
+            result.requires_grad = True
+            result.val = Value(result.data, requires_grad=True)
+            def _backward(grad_output):
+                if a.requires_grad:
+                    a.backward(grad_output)
+                if b.requires_grad:
+                    b.backward(-grad_output)
+            result.val.grad_fn = _backward
     else:
         result = a.__class__(np.subtract(a.data, b), dtype=a._pursuitnet_dtype, device=a.device)
-        result.val = a.val - b if a.val is not None else None
+        if a.requires_grad:
+            result.requires_grad = True
+            result.val = Value(result.data, requires_grad=True)
+            def _backward(grad_output):
+                a.backward(grad_output)
+            result.val.grad_fn = _backward
     return result
 
 def sum(a):
-    result = a.__class__(np.sum(a.data), dtype=a._pursuitnet_dtype, device=a.device, requires_grad=a.requires_grad)
+    result = a.__class__(np.sum(a.data), dtype=a._pursuitnet_dtype, device=a.device)
     if a.requires_grad:
+        result.requires_grad = True
+        result.val = Value(result.data, requires_grad=True)
         def _backward(grad_output):
             a.backward(np.full_like(a.data, grad_output))
         result.val.grad_fn = _backward
     return result
 
 def max(a, axis=None, keepdims=False):
-    return a.__class__(np.max(a.data, axis=axis, keepdims=keepdims), dtype=a._pursuitnet_dtype, device=a.device)
+    result = a.__class__(np.max(a.data, axis=axis, keepdims=keepdims), dtype=a._pursuitnet_dtype, device=a.device)
+    if a.requires_grad:
+        result.requires_grad = True
+        result.val = Value(result.data, requires_grad=True)
+        def _backward(grad_output):
+            mask = a.data == np.max(a.data, axis=axis, keepdims=True)
+            a.backward(grad_output * mask)
+        result.val.grad_fn = _backward
+    return result
 
 def min(a, axis=None, keepdims=False):
-    return a.__class__(np.min(a.data, axis=axis, keepdims=keepdims), dtype=a._pursuitnet_dtype, device=a.device)
+    result = a.__class__(np.min(a.data, axis=axis, keepdims=keepdims), dtype=a._pursuitnet_dtype, device=a.device)
+    if a.requires_grad:
+        result.requires_grad = True
+        result.val = Value(result.data, requires_grad=True)
+        def _backward(grad_output):
+            mask = a.data == np.min(a.data, axis=axis, keepdims=True)
+            a.backward(grad_output * mask)
+        result.val.grad_fn = _backward
+    return result
 
 def mean(a, axis=None, keepdims=False):
-    return a.__class__(np.mean(a.data, axis=axis, keepdims=keepdims), dtype=a._pursuitnet_dtype, device=a.device)
+    result = a.__class__(np.mean(a.data, axis=axis, keepdims=keepdims), dtype=a._pursuitnet_dtype, device=a.device)
+    if a.requires_grad:
+        result.requires_grad = True
+        result.val = Value(result.data, requires_grad=True)
+        def _backward(grad_output):
+            shape = np.array(a.data.shape)
+            if axis is not None:
+                shape[axis] = 1
+            a.backward(grad_output / np.prod(shape) * np.ones_like(a.data))
+        result.val.grad_fn = _backward
+    return result
 
 def reshape(a, *shape):
     if len(shape) == 1 and isinstance(shape[0], (tuple, list)):
         shape = shape[0]
-    return a.__class__(a.data.reshape(shape), dtype=a._pursuitnet_dtype, device=a.device)
+    result = a.__class__(a.data.reshape(shape), dtype=a._pursuitnet_dtype, device=a.device)
+    if a.requires_grad:
+        result.requires_grad = True
+        result.val = Value(result.data, requires_grad=True)
+        def _backward(grad_output):
+            a.backward(grad_output.reshape(a.data.shape))
+        result.val.grad_fn = _backward
+    return result
 
 def transpose(a, *axes):
     if not axes:
         axes = None
-    return a.__class__(np.transpose(a.data, axes), dtype=a._pursuitnet_dtype, device=a.device)
+    result = a.__class__(np.transpose(a.data, axes), dtype=a._pursuitnet_dtype, device=a.device)
+    if a.requires_grad:
+        result.requires_grad = True
+        result.val = Value(result.data, requires_grad=True)
+        def _backward(grad_output):
+            a.backward(np.transpose(grad_output, np.argsort(axes) if axes else None))
+        result.val.grad_fn = _backward
+    return result
 
 def zeros(cls, *shape, dtype, device, requires_grad):
     return cls(np.zeros(shape), dtype=dtype, device=device, requires_grad=requires_grad)

@@ -1,18 +1,19 @@
 import numpy as np
 from .function import Function
 from .value import Value
+import pursuitnet as pn
 
 class Add(Function):
     @staticmethod
     def forward(ctx, a, b):
         ctx.save_for_backward(a, b)
-        return Value(np.add(a.data, b.data), requires_grad=a.requires_grad or b.requires_grad)
+        return pn.Tensor(np.add(a.data, b.data), requires_grad=a.requires_grad or b.requires_grad)
 
     @staticmethod
     def backward(ctx, grad_output):
         a, b = ctx.saved_tensors
-        grad_a = Value(grad_output) if a.requires_grad else None
-        grad_b = Value(grad_output) if b.requires_grad else None
+        grad_a = pn.Tensor(grad_output.data) if a.requires_grad else None
+        grad_b = pn.Tensor(grad_output.data) if b.requires_grad else None
         return grad_a, grad_b
 
 class Mul(Function):

@@ -1,11 +1,7 @@
-try:
-    import cupy as np
-    HAS_CUPY = True
-except ImportError:
-    import numpy as np
-    HAS_CUPY = False
-
-from pursuitnet import dtypes, ops, device_utils, Value, grad_utils
+import numpy as np
+from pursuitnet import dtypes, ops, device_utils
+from pursuitnet.autograd.value import Value
+from pursuitnet.autograd import grad_utils
 
 class Size:
     def __init__(self, shape):
@@ -25,7 +21,7 @@ class Size:
     
     def __len__(self):
         return len(self.shape)
-    
+
 class Tensor:
     def __init__(self, data, dtype=dtypes.float32, device='cpu', requires_grad=False):
         self.device = device
@@ -33,17 +29,31 @@ class Tensor:
         self._numpy_dtype = dtype.numpy_dtype
         
         if data is None:
-            self.data = None
+            self._data = None
             self.shape = None
         elif isinstance(data, Tensor):
-            self.data = data.data.astype(self._numpy_dtype)
-            self.shape = Size(self.data.shape)
+            self._data = data.data.astype(self._numpy_dtype)
+            self.shape = Size(self._data.shape)
         else:
-            self.data = np.array(data, dtype=self._numpy_dtype)
-            self.shape = Size(self.data.shape)
+            self._data = np.array(data, dtype=self._numpy_dtype)
+            self.shape = Size(self._data.shape)
         
-        self.val = Value(self.data, requires_grad=requires_grad) if requires_grad else None
+        if requires_grad:
+            self.val = Value(self._data, requires_grad=True)
+        else:
+            self.val = None
+        self.requires_grad = requires_grad
         self._grad = None
+    
+    @property
+    def data(self):
+        return self._data
+
+    @data.setter
+    def data(self, value):
+        self._data = np.array(value)
+        if self.val is not None:
+            self.val.data = self._data
     
     @property
     def dtype(self):
@@ -62,25 +72,33 @@ class Tensor:
 
     @property
     def grad(self):
-        if self.val is not None:
-            return self.val.grad
         return self._grad
-    
+
     @grad.setter
     def grad(self, value):
-        if self.val is not None:
-            self.val.grad = value
+        if isinstance(value, Tensor):
+            self._grad = value.data
         else:
             self._grad = value
-    
+
     def backward(self, gradient=None):
-        grad_utils.backward(self, gradient)
-
+        if self.requires_grad:
+            if gradient is None:
+                gradient = np.ones_like(self.data)
+            if self.grad is None:
+                self.grad = np.zeros_like(self.data)
+            self.grad += gradient
+            if self.val is not None:
+                self.val.backward(gradient)
+                
     def zero_grad(self):
-        grad_utils.zero_grad(self)
-
-    def _update_grad(self):
-        grad_utils.update_grad(self)
+        if self.requires_grad:
+            if self.grad is None:
+                self.grad = np.zeros_like(self.data)
+            else:
+                self.grad.fill(0)
+            if self.val is not None:
+                self.val.zero_grad()
 
     def __getitem__(self, key):
         return Tensor(self.data[key], dtype=self._pursuitnet_dtype, device=self.device)
@@ -90,9 +108,6 @@ class Tensor:
 
     def __str__(self):
         return self.__repr__()
-
-    def __add__(self, other):
-        return ops.add(self, other)
 
     def __mul__(self, other):
         return ops.mul(self, other)
@@ -108,6 +123,9 @@ class Tensor:
     
     def sum(self):
         return ops.sum(self)
+
+    def __add__(self, other):
+        return ops.add(self, other)
 
     def max(self, axis=None, keepdims=False):
         return ops.max(self, axis, keepdims)

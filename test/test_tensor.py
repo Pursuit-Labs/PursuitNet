@@ -323,11 +323,27 @@ class TestGradients(unittest.TestCase):
         pt_x = torch.tensor([1.0, 2.0, 3.0], requires_grad=True)
         pt_y = torch.tensor([4.0, 5.0, 6.0], requires_grad=True)
         
+        print("Initial tensors:")
+        print("pn_x:", pn_x.data)
+        print("pn_y:", pn_y.data)
+        print("pt_x:", pt_x.detach().numpy())
+        print("pt_y:", pt_y.detach().numpy())
+        
         pn_z = ((pn_x * pn_y).sum() + (pn_x + pn_y).sum()) * pn_x.sum()
         pt_z = ((pt_x * pt_y).sum() + (pt_x + pt_y).sum()) * pt_x.sum()
         
+        print("\nComputed results:")
+        print("pn_z:", pn_z.data)
+        print("pt_z:", pt_z.detach().numpy())
+        
         pn_z.backward()
         pt_z.backward()
+        
+        print("\nGradients:")
+        print("pn_x.grad:", pn_x.grad)
+        print("pt_x.grad:", pt_x.grad.numpy())
+        print("pn_y.grad:", pn_y.grad)
+        print("pt_y.grad:", pt_y.grad.numpy())
         
         self.assert_close(pn_x.grad, pt_x.grad)
         self.assert_close(pn_y.grad, pt_y.grad)

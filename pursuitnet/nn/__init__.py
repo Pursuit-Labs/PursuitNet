@@ -4,3 +4,4 @@ from .sequential import Sequential
 from .linear import Linear
 from .activation import ReLU
 import pursuitnet.nn.functional as F
+from .loss import *
