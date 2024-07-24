@@ -40,7 +40,12 @@ class Adam(Optim):
     def zero_grad(self):
         for p in self.params:
             if p.grad is not None:
-                p.grad.data.fill(0)
+                if isinstance(p.grad, pn.Tensor):
+                    p.grad.data[:] = 0
+                elif isinstance(p.grad, np.ndarray):
+                    p.grad.fill(0)
+                else:
+                    p.grad = np.zeros_like(p.data)
 
 # This function will be accessible as optim.Adam
 def create_adam_optimizer(params, lr=0.001, betas=(0.9, 0.999), eps=1e-8):
