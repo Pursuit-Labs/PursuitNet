@@ -17,3 +17,6 @@ class Rand:
         rand = np.random.rand()
         print(f"Random number from pursuitnet.random: {rand}")
         return rand
+
+    def choice(self, a, size=None, replace=True, p=None):
+        return np.random.choice(a, size, replace, p)
