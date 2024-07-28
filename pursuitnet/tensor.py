@@ -90,7 +90,7 @@ class Tensor:
             self.grad += gradient
             if self.val is not None:
                 self.val.backward(gradient)
-                
+
     def zero_grad(self):
         if self.requires_grad:
             if self.grad is None:
@@ -108,6 +108,12 @@ class Tensor:
 
     def __str__(self):
         return self.__repr__()
+    
+    def __len__(self):
+        return self.shape[0]
+
+    def __eq__(self, other):
+        return ops.eq(self, other)
 
     def __mul__(self, other):
         return ops.mul(self, other)
