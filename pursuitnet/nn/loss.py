@@ -38,21 +38,25 @@ class CrossEntropyLoss:
             grad_output = 1.0
 
         batch_size = self.input.shape[0]
-        
+
         # Compute cross entropy loss gradients
         dx = self.softmax_output.copy()
-        target_indices = self.target.data.astype(int)  # Ensure target indices are integers
+        target_indices = self.target.data.astype(int)
         dx[range(batch_size), target_indices] -= 1
         dx /= batch_size
 
         # Apply grad_output
         dx *= grad_output
 
+        print(f"CrossEntropyLoss backward: input grad norm = {np.linalg.norm(dx)}")
+
         if self.input.requires_grad:
             if self.input.grad is None:
                 self.input.grad = dx
             else:
                 self.input.grad += dx
+
+        print(f"CrossEntropyLoss backward: final input grad norm = {np.linalg.norm(self.input.grad)}")
 
     def __call__(self, input_tensor: Tensor, target: Tensor) -> Tensor:
         return self.forward(input_tensor, target)

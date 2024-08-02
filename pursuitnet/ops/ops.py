@@ -7,22 +7,24 @@ except ImportError:
 
 from ..autograd import operations
 from pursuitnet.autograd.value import Value
+from pursuitnet.autograd.parameter import Parameter
 
 def add(a, b):
     if isinstance(b, (int, float)):
         result = a.__class__(np.add(a.data, b), dtype=a._pursuitnet_dtype, device=a.device)
-    elif isinstance(b, a.__class__):
-        result = a.__class__(np.add(a.data, b.data), dtype=a._pursuitnet_dtype, device=a.device)
+    elif isinstance(b, (a.__class__, Parameter)):
+        b_data = b.data if isinstance(b, Parameter) else b.data
+        result = a.__class__(np.add(a.data, b_data), dtype=a._pursuitnet_dtype, device=a.device)
     else:
         raise TypeError(f"Unsupported operand type for +: '{type(a).__name__}' and '{type(b).__name__}'")
 
-    if a.requires_grad or (isinstance(b, a.__class__) and b.requires_grad):
+    if a.requires_grad or (isinstance(b, (a.__class__, Parameter)) and b.requires_grad):
         result.requires_grad = True
         result.val = Value(result.data, requires_grad=True)
         def _backward(grad_output):
             if a.requires_grad:
                 a.backward(grad_output)
-            if isinstance(b, a.__class__) and b.requires_grad:
+            if isinstance(b, (a.__class__, Parameter)) and b.requires_grad:
                 b.backward(grad_output)
         result.val.grad_fn = _backward
     return result
@@ -54,6 +56,9 @@ def matmul(a, b):
         result.requires_grad = True
         result.val = Value(result.data, requires_grad=True)
         def _backward(grad_output):
+            # Ensure grad_output is at least 2D
+            if grad_output.ndim == 0:
+                grad_output = grad_output * np.ones_like(result.data)
             if a.requires_grad:
                 a.backward(np.matmul(grad_output, b.data.T))
             if b.requires_grad:
@@ -105,14 +110,33 @@ def sub(a, b):
             result.val.grad_fn = _backward
     return result
 
-def sum(a):
-    result = a.__class__(np.sum(a.data), dtype=a._pursuitnet_dtype, device=a.device)
+def sum(a, axis=None, keepdims=False):
+    result_data = np.sum(a.data, axis=axis, keepdims=keepdims)
+    result = a.__class__(result_data, dtype=a._pursuitnet_dtype, device=a.device)
+    
     if a.requires_grad:
         result.requires_grad = True
         result.val = Value(result.data, requires_grad=True)
+        
         def _backward(grad_output):
-            a.backward(np.full_like(a.data, grad_output))
+            # Ensure grad_output has the same shape as the original input
+            if axis is not None:
+                grad_shape = list(a.data.shape)
+                if not keepdims:
+                    if isinstance(axis, (list, tuple)):
+                        for ax in sorted(axis, reverse=True):
+                            grad_shape.insert(ax, 1)
+                    else:
+                        grad_shape.insert(axis, 1)
+                grad_output = np.broadcast_to(grad_output.reshape(grad_shape), a.data.shape)
+            else:
+                # If axis is None, the result is a scalar, so we broadcast to the original shape
+                grad_output = np.full(a.data.shape, grad_output)
+            
+            a.backward(grad_output)
+        
         result.val.grad_fn = _backward
+    
     return result
 
 def max(a, axis=None, keepdims=False):
