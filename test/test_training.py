@@ -12,20 +12,17 @@ import pursuitnet.nn as nn
 class TestTrainingLoop(unittest.TestCase):
     def setUp(self):
         print("\nSetting up test...")
-        # Example data
         self.X = np.random.randn(100, 10)
-        self.y = np.random.randint(0, 2, size=(100,))  # Assume binary classification
+        self.y = np.random.randint(0, 2, size=(100,))
         print(f"Data shape: X: {self.X.shape}, y: {self.y.shape}")
 
-        # Model setup
         self.model = [
             nn.Linear(10, 50),
             nn.ReLU(),
-            nn.Linear(50, 2)  # Binary classification with 2 classes
+            nn.Linear(50, 2)
         ]
         print("Model architecture:", self.model)
 
-        # Loss function and optimizer
         self.loss_fn = nn.CrossEntropyLoss()
         self.optimizer = pn.optim.Adam(self.model_parameters(), lr=0.01)
         print(f"Optimizer: {self.optimizer}, Learning rate: {self.optimizer.lr}")
@@ -34,14 +31,16 @@ class TestTrainingLoop(unittest.TestCase):
         params = []
         for layer in self.model:
             if isinstance(layer, nn.Linear):
-                params.extend([layer.weight, layer.bias])
+                params.append(layer.weight)
+                if layer.bias is not None:
+                    params.append(layer.bias)
         print(f"Total parameters: {len(params)}")
         return params
 
     def forward_pass(self, Xbatch):
-        output = pn.Tensor(Xbatch)
+        output = Xbatch
         for i, layer in enumerate(self.model):
-            output = layer(output)
+            output = layer.forward(output)
             print(f"Layer {i} output shape: {output.shape}")
         return output
 
@@ -55,7 +54,8 @@ class TestTrainingLoop(unittest.TestCase):
             epoch_losses = []
             for i in range(0, len(self.X), batch_size):
                 Xbatch = pn.Tensor(self.X[i:i + batch_size], requires_grad=True)
-                ybatch = pn.Tensor(self.y[i:i + batch_size].flatten(), requires_grad=False)
+                ybatch = self.y[i:i + batch_size]  # No need to wrap ybatch as Tensor
+
                 print(f"  Batch {i//batch_size + 1}: X shape: {Xbatch.shape}, y shape: {ybatch.shape}")
 
                 # Forward pass
@@ -63,22 +63,16 @@ class TestTrainingLoop(unittest.TestCase):
                 print(f"  Predictions shape: {y_pred.shape}")
 
                 # Compute loss
-                loss = self.loss_fn(y_pred, ybatch)
-                print(f"  Batch loss: {loss.data.item()}")
-                epoch_losses.append(loss.data.item())
+                loss = self.loss_fn.forward(y_pred, ybatch)
+                print(f"  Batch loss: {loss.data}")
+                epoch_losses.append(loss.data)
 
-                # Backward pass and optimization
-                self.optimizer.zero_grad()
-                loss.backward()
-                
-                # Print gradients
-                print("  Gradients:")
-                for j, param in enumerate(self.model_parameters()):
-                    if param.grad is not None:
-                        print(f"    Param {j} grad norm: {np.linalg.norm(param.grad)}")
-                    else:
-                        print(f"    Param {j} grad is None")
-                
+                # Backward pass
+                grad_output = self.loss_fn.backward()  # No extra arguments
+                for layer in reversed(self.model):
+                    grad_output = layer.backward(grad_output)
+
+                # Optimization
                 self.optimizer.step()
 
             avg_epoch_loss = np.mean(epoch_losses)

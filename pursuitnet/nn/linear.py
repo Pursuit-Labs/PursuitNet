@@ -1,31 +1,32 @@
-import numpy as np
-from .module import Module
-import pursuitnet as pn
-from ..autograd.parameter import Parameter
+# pursuitnet/nn/linear.py
 
-class Linear(Module):
-    def __init__(self, in_features, out_features, bias=True):
-        super(Linear, self).__init__()
+import numpy as np
+from pursuitnet.tensor import Tensor
+
+class Linear:
+    def __init__(self, in_features, out_features, initial_weights=None, initial_bias=None):
         self.in_features = in_features
         self.out_features = out_features
-        self.weight = Parameter(np.random.randn(out_features, in_features).astype(np.float32) * np.sqrt(2.0 / in_features))
-        if bias:
-            self.bias = Parameter(np.zeros(out_features).astype(np.float32))
-        else:
-            self.bias = None
+        self.weight = Tensor(
+            initial_weights if initial_weights is not None else np.random.randn(in_features, out_features).astype(np.float32) * np.sqrt(2. / in_features),
+            requires_grad=True
+        )
+        self.bias = Tensor(
+            initial_bias if initial_bias is not None else np.zeros(out_features, dtype=np.float32),
+            requires_grad=True
+        )
 
-    def forward(self, x: pn.Tensor) -> pn.Tensor:
-        if not isinstance(x, pn.Tensor):
-            raise TypeError("Input is not a Tensor")
+    def forward(self, input):
+        self.input = input
+        return input @ self.weight + self.bias
 
-        print(f"Linear forward: weight norm = {np.linalg.norm(self.weight.data)}, bias norm = {np.linalg.norm(self.bias.data) if self.bias is not None else 0}")
-
-        # Perform linear transformation
-        output = x @ pn.Tensor(self.weight.data.T, requires_grad=True)
-        if self.bias is not None:
-            output = output + pn.Tensor(self.bias.data, requires_grad=True)
-
-        return output
+    def backward(self, grad_output):
+        # Compute gradient for weights and bias
+        self.weight.grad = self.input.data.T @ grad_output
+        self.bias.grad = np.sum(grad_output, axis=0)
+        
+        # Return gradient for previous layer
+        return grad_output @ self.weight.data.T
 
     def __repr__(self):
         return f"Linear(in_features={self.in_features}, out_features={self.out_features})"

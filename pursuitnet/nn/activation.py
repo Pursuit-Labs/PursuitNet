@@ -1,20 +1,29 @@
+# pursuitnet/nn/activation.py
+
 import numpy as np
-from .module import Module
-import pursuitnet as pn
+from pursuitnet.tensor import Tensor
 
-class ReLU(Module):
-    def forward(self, x: pn.Tensor) -> pn.Tensor:
-        if not isinstance(x, pn.Tensor):
-            raise TypeError("Input to ReLU is not a Tensor")
+class ReLU:
+    def forward(self, input: Tensor) -> Tensor:
+        # Ensure input is a Tensor
+        if not isinstance(input, Tensor):
+            raise TypeError("Input to ReLU must be a Tensor")
 
-        # Create a zero tensor with the same shape as x
-        zero_tensor = pn.Tensor(np.zeros_like(x.data), requires_grad=False)
-        result = x.max(other=zero_tensor)  # Element-wise max with zero
+        # Element-wise maximum with zero
+        output_data = np.maximum(0, input.data)
 
-        if not isinstance(result, pn.Tensor):
-            raise TypeError("Output from ReLU is not a Tensor")
+        # Create output Tensor
+        output = Tensor(output_data, dtype=input._pursuitnet_dtype, device=input.device, requires_grad=input.requires_grad)
 
-        return result
+        # Save input for backpropagation
+        self.input = input
+
+        return output
+
+    def backward(self, grad_output):
+        # Backward pass through ReLU
+        grad_input = grad_output * (self.input.data > 0)
+        return grad_input
 
     def __repr__(self):
         return "ReLU()"

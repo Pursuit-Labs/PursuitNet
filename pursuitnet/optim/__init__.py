@@ -1,5 +1,5 @@
 # optim/__init__.py
-from .optimizers import Optim, Adam, create_adam_optimizer as Adam
+from .optimizers import Adam
 import numpy as np
 
 def print_random_number():
