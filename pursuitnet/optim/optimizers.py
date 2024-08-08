@@ -17,17 +17,36 @@ class Adam:
         for param in self.parameters:
             if param.grad is not None:
                 param.grad.fill(0)
+            else:
+                param.grad = np.zeros_like(param.data)
 
     def step(self):
         self.t += 1
-        lr_t = self.lr * (np.sqrt(1 - self.beta2 ** self.t) / (1 - self.beta1 ** self.t))
         for i, param in enumerate(self.parameters):
-            if param.grad is not None:
-                self.m[i] = self.beta1 * self.m[i] + (1 - self.beta1) * param.grad
-                self.v[i] = self.beta2 * self.v[i] + (1 - self.beta2) * (param.grad ** 2)
-                m_hat = self.m[i] / (1 - self.beta1 ** self.t)
-                v_hat = self.v[i] / (1 - self.beta2 ** self.t)
-                param.data -= lr_t * m_hat / (np.sqrt(v_hat) + self.epsilon)
+            if param.grad is None:
+                continue
+            
+            grad = param.grad
+            
+            m_t = self.beta1 * self.m[i] + (1 - self.beta1) * grad
+            v_t = self.beta2 * self.v[i] + (1 - self.beta2) * (grad ** 2)
+            
+            self.m[i] = m_t
+            self.v[i] = v_t
+            
+            m_hat = m_t / (1 - self.beta1 ** self.t)
+            v_hat = v_t / (1 - self.beta2 ** self.t)
+            
+            update = self.lr * m_hat / (np.sqrt(v_hat) + self.epsilon)
+            
+            # Ensure update has the same shape as param.data
+            if update.shape != param.data.shape:
+                if len(param.data.shape) == 1:
+                    update = np.sum(update, axis=0)
+                else:
+                    raise ValueError(f"Unexpected shape mismatch: param {param.data.shape}, update {update.shape}")
+            
+            param.data -= update
 
     def __repr__(self):
         return f"Adam(lr={self.lr}, beta1={self.beta1}, beta2={self.beta2}, epsilon={self.epsilon})"

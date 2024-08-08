@@ -66,6 +66,7 @@ class TestAdamOptimizer(unittest.TestCase):
         self.adam_pn.zero_grad()
 
         for param in self.params:
+            self.assertIsNotNone(param.grad)
             self.assertTrue(np.allclose(param.grad, 0))
 
     def test_multiple_steps(self):

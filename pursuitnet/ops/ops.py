@@ -1,4 +1,4 @@
-# pursuitnet/ops/basic_ops.py
+# pursuitnet/ops/ops.py
 
 try:
     import cupy as np
@@ -7,10 +7,8 @@ except ImportError:
     import numpy as np
     HAS_CUPY = False
 
-from ..autograd import operations
 import pursuitnet as pn
 from pursuitnet.autograd.value import Value
-from pursuitnet.autograd.parameter import Parameter
 
 def add(a, b):
     if not isinstance(a, pn.Tensor):
@@ -30,6 +28,28 @@ def add(a, b):
         result._grad_fn = _backward
     return result
 
+def sub(a, b):
+    if isinstance(b, a.__class__):
+        result = a.__class__(np.subtract(a.data, b.data), dtype=a._pursuitnet_dtype, device=a.device)
+        if a.requires_grad or b.requires_grad:
+            result.requires_grad = True
+            result.val = Value(result.data, requires_grad=True)
+            def _backward(grad_output):
+                if a.requires_grad:
+                    a.backward(grad_output)
+                if b.requires_grad:
+                    b.backward(-grad_output)
+            result.val.grad_fn = _backward
+    else:
+        result = a.__class__(np.subtract(a.data, b), dtype=a._pursuitnet_dtype, device=a.device)
+        if a.requires_grad:
+            result.requires_grad = True
+            result.val = Value(result.data, requires_grad=True)
+            def _backward(grad_output):
+                a.backward(grad_output)
+            result.val.grad_fn = _backward
+    return result
+
 def mul(a, b):
     if not isinstance(a, pn.Tensor):
         a, b = b, a  # Ensure 'a' is always a Tensor
@@ -45,17 +65,6 @@ def mul(a, b):
                 a.backward(grad * b_data)
             if isinstance(b, pn.Tensor) and b.requires_grad:
                 b.backward(grad * a.data)
-        result._grad_fn = _backward
-    return result
-
-def matmul(a, b):
-    result = pn.Tensor(np.matmul(a.data, b.data), requires_grad=(a.requires_grad or b.requires_grad))
-    if result.requires_grad:
-        def _backward(grad):
-            if a.requires_grad:
-                a.backward(np.matmul(grad, b.data.T))
-            if b.requires_grad:
-                b.backward(np.matmul(a.data.T, grad))
         result._grad_fn = _backward
     return result
 
@@ -81,26 +90,20 @@ def div(a, b):
             result.val.grad_fn = _backward
     return result
 
-def sub(a, b):
-    if isinstance(b, a.__class__):
-        result = a.__class__(np.subtract(a.data, b.data), dtype=a._pursuitnet_dtype, device=a.device)
-        if a.requires_grad or b.requires_grad:
-            result.requires_grad = True
-            result.val = Value(result.data, requires_grad=True)
-            def _backward(grad_output):
-                if a.requires_grad:
-                    a.backward(grad_output)
-                if b.requires_grad:
-                    b.backward(-grad_output)
-            result.val.grad_fn = _backward
-    else:
-        result = a.__class__(np.subtract(a.data, b), dtype=a._pursuitnet_dtype, device=a.device)
-        if a.requires_grad:
-            result.requires_grad = True
-            result.val = Value(result.data, requires_grad=True)
-            def _backward(grad_output):
-                a.backward(grad_output)
-            result.val.grad_fn = _backward
+def matmul(a, b):
+    if not isinstance(a, pn.Tensor):
+        a = pn.Tensor(a)
+    if not isinstance(b, pn.Tensor):
+        b = pn.Tensor(b)
+    
+    result = pn.Tensor(np.matmul(a.data, b.data), requires_grad=(a.requires_grad or b.requires_grad))
+    if result.requires_grad:
+        def _backward(grad):
+            if a.requires_grad:
+                a.backward(np.matmul(grad, b.data.T))
+            if b.requires_grad:
+                b.backward(np.matmul(a.data.T, grad))
+        result._grad_fn = _backward
     return result
 
 def sum(a, axis=None, keepdims=False):
@@ -112,7 +115,6 @@ def sum(a, axis=None, keepdims=False):
         result.val = Value(result.data, requires_grad=True)
         
         def _backward(grad_output):
-            # Ensure grad_output has the same shape as the original input
             if axis is not None:
                 grad_shape = list(a.data.shape)
                 if not keepdims:
@@ -123,7 +125,6 @@ def sum(a, axis=None, keepdims=False):
                         grad_shape.insert(axis, 1)
                 grad_output = np.broadcast_to(grad_output.reshape(grad_shape), a.data.shape)
             else:
-                # If axis is None, the result is a scalar, so we broadcast to the original shape
                 grad_output = np.full(a.data.shape, grad_output)
             
             a.backward(grad_output)

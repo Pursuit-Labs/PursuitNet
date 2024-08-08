@@ -1,11 +1,9 @@
-import numpy as np
+from pursuitnet.nn.module import Module
 from pursuitnet.tensor import Tensor
+import numpy as np
 
-class ReLU:
+class ReLU(Module):
     def forward(self, input: Tensor) -> Tensor:
-        if not isinstance(input, Tensor):
-            raise TypeError("Input to ReLU must be a Tensor")
-
         output_data = np.maximum(0, input.data)
         output = Tensor(output_data, dtype=input._pursuitnet_dtype, device=input.device, requires_grad=input.requires_grad)
 
@@ -17,9 +15,6 @@ class ReLU:
             output._grad_fn = _backward
 
         return output
-
-    def __call__(self, input: Tensor) -> Tensor:
-        return self.forward(input)
 
     def __repr__(self):
         return "ReLU()"

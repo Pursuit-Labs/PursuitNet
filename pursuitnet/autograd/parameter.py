@@ -1,14 +1,9 @@
 import numpy as np
+import pursuitnet as pn
 
-class Parameter:
+class Parameter(pn.Tensor):
     def __init__(self, data, requires_grad=True):
-        self.data = data
-        self.requires_grad = requires_grad
-        self.grad = None
-
+        super().__init__(data, requires_grad=requires_grad)
+    
     def zero_grad(self):
         self.grad = None
-
-    def __repr__(self):
-        # Provide a string representation for easier debugging
-        return f'Parameter(data={self.data}, grad={self.grad})'

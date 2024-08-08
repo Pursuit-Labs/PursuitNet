@@ -6,7 +6,7 @@ __version__ = '0.1.0'
 from .tensor import Tensor
 
 # Import main components of the library
-from .autograd import grad_utils, Value, operations
+from .autograd import grad_utils, Value, operations, parameter
 from .nn import *
 from .optim import *
 from .dtype import *

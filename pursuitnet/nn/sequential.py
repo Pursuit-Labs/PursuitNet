@@ -1,5 +1,4 @@
-from .module import Module
-import pursuitnet as pn
+from pursuitnet.nn.module import Module
 
 class Sequential(Module):
     def __init__(self, *args):
@@ -15,14 +14,16 @@ class Sequential(Module):
 
     def forward(self, x):
         for module in self._modules.values():
-            assert isinstance(x, pn.Tensor), f"Input to {module} is not a Tensor"  # Debugging statement
             x = module(x)
-            assert isinstance(x, pn.Tensor), f"Output from {module} is not a Tensor"  # Debugging statement
         return x
+
+    @property
+    def layers(self):
+        return list(self._modules.values())
 
     def __repr__(self):
         module_str = self.__class__.__name__ + '('
-        for name, module in self._modules.items():
-            module_str += '\n  (' + name + '): ' + repr(module)
+        for idx, module in enumerate(self._modules.values()):
+            module_str += f'\n  ({idx}): {repr(module)}'
         module_str += '\n)'
         return module_str

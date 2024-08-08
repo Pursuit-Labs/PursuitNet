@@ -16,9 +16,19 @@ class Module:
     def __setattr__(self, name, value):
         if isinstance(value, Module):
             self._modules[name] = value
-        elif isinstance(value, Parameter):  # Correctly register Parameters
+        elif isinstance(value, Parameter):
             self._parameters.append(value)
         object.__setattr__(self, name, value)
+
+    def parameters(self):
+        params = self._parameters[:]
+        for module in self._modules.values():
+            params.extend(module.parameters())
+        return params
+
+    def zero_grad(self):
+        for param in self.parameters():
+            param.zero_grad()
 
     def __repr__(self):
         module_str = self.__class__.__name__ + '('
@@ -26,15 +36,3 @@ class Module:
             module_str += '\n  (' + name + '): ' + repr(module)
         module_str += '\n)'
         return module_str
-
-    def parameters(self):
-        # Collect parameters from this module and all sub-modules
-        params = self._parameters[:]
-        for name, module in self._modules.items():
-            params += module.parameters()
-        return params
-
-    def zero_grad(self):
-        # Zero the gradients of all parameters
-        for param in self.parameters():
-            param.zero_grad()

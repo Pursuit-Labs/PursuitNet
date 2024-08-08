@@ -31,9 +31,18 @@ class Tensor:
             grad = np.ones_like(self.data)
 
         if self.grad is None:
-            self.grad = grad
-        else:
-            self.grad += grad
+            self.grad = np.zeros_like(self.data)
+
+        # Ensure grad has the same shape as self.grad
+        if self.grad.shape != grad.shape:
+            if self.grad.size == grad.size:
+                grad = grad.reshape(self.grad.shape)
+            else:
+                # If sizes don't match, we need to sum over the extra dimensions
+                sum_axes = tuple(range(grad.ndim - self.grad.ndim))
+                grad = grad.sum(axis=sum_axes).reshape(self.grad.shape)
+
+        self.grad += grad
 
         if self._grad_fn:
             self._grad_fn(grad)
