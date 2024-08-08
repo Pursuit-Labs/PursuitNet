@@ -48,22 +48,22 @@ class TestModelCreation(unittest.TestCase):
                 super(CustomNet, self).__init__()
                 self.fc1 = pn_nn.Linear(28 * 28, 512)
                 self.fc2 = pn_nn.Linear(512, 10)
-                self.relu = pn_nn.ReLU()  # Use ReLU from activation.py
+                self.relu = pn_nn.ReLU()
                 self.init_weights(fc1_weights, fc1_bias, fc2_weights, fc2_bias)
 
             def init_weights(self, fc1_weights, fc1_bias, fc2_weights, fc2_bias):
-                # Correctly set parameters as Tensor objects
-                self.fc1.weight.data = fc1_weights
-                self.fc1.bias.data = fc1_bias
-                self.fc2.weight.data = fc2_weights
-                self.fc2.bias.data = fc2_bias
+                # Initialize weights using the provided data
+                self.fc1.weight = pn.Tensor(fc1_weights.T, requires_grad=True)  # Transpose the weights
+                self.fc1.bias = pn.Tensor(fc1_bias, requires_grad=True)
+                self.fc2.weight = pn.Tensor(fc2_weights.T, requires_grad=True)  # Transpose the weights
+                self.fc2.bias = pn.Tensor(fc2_bias, requires_grad=True)
 
             def forward(self, x):
                 if not isinstance(x, pn.Tensor):
-                    x = pn.Tensor(x)  # Ensure x is a PursuitNet Tensor
+                    x = pn.Tensor(x)
 
-                x = x.reshape(-1, 28 * 28)  # Using reshape method from Tensor class
-                x = self.relu(self.fc1(x))  # Use the ReLU activation class
+                x = x.reshape(-1, 28 * 28)
+                x = self.relu(self.fc1(x))
                 x = self.fc2(x)
                 return x
 

@@ -27,6 +27,9 @@ class Linear:
         
         # Return gradient for previous layer
         return grad_output @ self.weight.data.T
+    
+    def __call__(self, input):
+        return self.forward(input)
 
     def __repr__(self):
         return f"Linear(in_features={self.in_features}, out_features={self.out_features})"

@@ -24,6 +24,9 @@ class ReLU:
         # Backward pass through ReLU
         grad_input = grad_output * (self.input.data > 0)
         return grad_input
+    
+    def __call__(self, input: Tensor) -> Tensor:
+        return self.forward(input)
 
     def __repr__(self):
         return "ReLU()"
