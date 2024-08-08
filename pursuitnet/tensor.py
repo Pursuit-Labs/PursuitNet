@@ -10,6 +10,7 @@ class Tensor:
         self.data = np.array(data, dtype=dtype)
         self.requires_grad = requires_grad
         self.grad = None if not requires_grad else np.zeros_like(self.data)
+        self._backward = lambda grad=None: None
 
     @property
     def shape(self):
@@ -24,10 +25,7 @@ class Tensor:
             return
         if grad is None:
             grad = np.ones_like(self.data)
-        if self.grad is None:
-            self.grad = grad
-        else:
-            self.grad += grad
+        self._backward(grad)
 
     def __getitem__(self, key):
         return Tensor(self.data[key], dtype=self._pursuitnet_dtype, device=self.device, requires_grad=self.requires_grad)

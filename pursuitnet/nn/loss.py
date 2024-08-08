@@ -24,7 +24,8 @@ class CrossEntropyLoss:
 
         # Compute cross-entropy loss
         batch_size = input_tensor.shape[0]
-        target_indices = target.astype(int)  # Ensure target indices are integers
+        target_data = target.data if isinstance(target, Tensor) else target
+        target_indices = target_data.astype(int)  # Ensure target indices are integers
         loss = -np.sum(np.log(probs[np.arange(batch_size), target_indices] + 1e-9)) / batch_size
 
         # Ensure loss is a scalar
@@ -32,15 +33,20 @@ class CrossEntropyLoss:
 
         # Create output tensor for the loss
         output = Tensor(loss, dtype=input_tensor._pursuitnet_dtype, device=input_tensor.device, requires_grad=input_tensor.requires_grad)
+        output._backward = self.backward  # Attach backward method to the output tensor
 
         return output
 
-    def backward(self) -> np.ndarray:
+    def backward(self, grad=None) -> np.ndarray:
+        print("Backward method called")
+        print(f"Input requires_grad: {self.input.requires_grad}")
+        print(f"Initial input grad: {self.input.grad}")
         # Compute cross-entropy loss gradients
         batch_size = self.input.shape[0]
 
         dx = self.softmax_output.copy()
-        target_indices = self.target.astype(int)
+        target_data = self.target.data if isinstance(self.target, Tensor) else self.target
+        target_indices = target_data.astype(int)
         dx[np.arange(batch_size), target_indices] -= 1
         dx /= batch_size
 
