@@ -54,6 +54,9 @@ class Tensor:
     def reshape(self, *shape):
         reshaped_data = self.data.reshape(shape)
         return Tensor(reshaped_data, dtype=self._pursuitnet_dtype, device=self.device, requires_grad=self.requires_grad)
+    
+    def sum(self):
+        return Tensor(self.data.sum(), dtype=self._pursuitnet_dtype, device=self.device, requires_grad=False)
 
     @classmethod
     def zeros(cls, *shape, dtype=np.float32, device='cpu', requires_grad=False):

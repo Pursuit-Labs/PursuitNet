@@ -1,18 +1,17 @@
-# pursuitnet/optim/optimizers.py
-
 import numpy as np
 from pursuitnet.tensor import Tensor
 
 class Adam:
     def __init__(self, parameters, lr=0.001, beta1=0.9, beta2=0.999, epsilon=1e-8):
-        self.parameters = parameters  # This should be a list of Tensor objects
+        self.parameters = parameters
         self.lr = lr
         self.beta1 = beta1
         self.beta2 = beta2
+        self.betas = (beta1, beta2)
         self.epsilon = epsilon
         self.t = 0
-        self.m = [np.zeros_like(param.data) for param in parameters]
-        self.v = [np.zeros_like(param.data) for param in parameters]
+        self.m = [np.zeros_like(param.data, dtype=np.float32) for param in parameters]
+        self.v = [np.zeros_like(param.data, dtype=np.float32) for param in parameters]
 
     def zero_grad(self):
         for param in self.parameters:
