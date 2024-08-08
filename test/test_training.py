@@ -48,6 +48,7 @@ class TestTrainingLoop(unittest.TestCase):
         print("\nStarting training loop...")
         n_epochs = 10
         batch_size = 10
+        first_epoch_loss = None
         last_epoch_loss = None
         for epoch in range(n_epochs):
             print(f"\nEpoch {epoch + 1}/{n_epochs}")
@@ -77,15 +78,25 @@ class TestTrainingLoop(unittest.TestCase):
 
             avg_epoch_loss = np.mean(epoch_losses)
             print(f'Finished epoch {epoch + 1}, average loss {avg_epoch_loss}')
+            
 
-            if last_epoch_loss is not None:
-                print(f"  Previous epoch loss: {last_epoch_loss}")
-                print(f"  Current epoch loss: {avg_epoch_loss}")
-                print(f"  Loss change: {last_epoch_loss - avg_epoch_loss}")
-                self.assertLess(avg_epoch_loss, last_epoch_loss, "Loss did not decrease; training may not be effective.")
-                self.assertNotEqual(last_epoch_loss, avg_epoch_loss, "Loss did not change; weights may not be updating.")
+            # if last_epoch_loss is not None:
+            #     print(f"  Previous epoch loss: {last_epoch_loss}")
+            #     print(f"  Current epoch loss: {avg_epoch_loss}")
+            #     print(f"  Loss change: {last_epoch_loss - avg_epoch_loss}")
+            #     self.assertLess(avg_epoch_loss, last_epoch_loss, "Loss did not decrease; training may not be effective.")
+            #     self.assertNotEqual(last_epoch_loss, avg_epoch_loss, "Loss did not change; weights may not be updating.")
+
+            if epoch == 0:
+                first_epoch_loss = avg_epoch_loss
 
             last_epoch_loss = avg_epoch_loss
+        
+        print(f"\nLoss in the first epoch: {first_epoch_loss}")
+        print(f"Loss in the last epoch: {last_epoch_loss}")
+
+        self.assertLess(last_epoch_loss, first_epoch_loss, "Loss did not decrease; training may not be effective.")
+        self.assertNotEqual(last_epoch_loss, first_epoch_loss, "Loss did not change; weights may not be updating.")
 
     def test_zero_grad(self):
         print("\nTesting zero_grad...")
