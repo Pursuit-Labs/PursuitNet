@@ -9,8 +9,9 @@ class Tensor:
         self._pursuitnet_dtype = dtype
         self.data = np.array(data, dtype=dtype())
         self.requires_grad = requires_grad
-        self.grad = None
+        self.grad = None if requires_grad else None
         self._backward_hooks = []
+        self._grad_fn = None
 
     @property
     def shape(self):
@@ -22,15 +23,21 @@ class Tensor:
 
     def backward(self, grad=None):
         if not self.requires_grad:
-            raise RuntimeError("This tensor does not require gradients")
+            return
+
         if grad is None:
             if self.data.size != 1:
                 raise RuntimeError("Gradients can only be implicitly created for scalar outputs")
             grad = np.ones_like(self.data)
+
         if self.grad is None:
             self.grad = grad
         else:
             self.grad += grad
+
+        if self._grad_fn:
+            self._grad_fn(grad)
+
         for hook in self._backward_hooks:
             hook(grad)
 
@@ -87,14 +94,26 @@ class Tensor:
     def __add__(self, other):
         return ops.add(self, other)
 
+    def __radd__(self, other):
+        return ops.add(self, other)
+
     def __sub__(self, other):
         return ops.sub(self, other)
+
+    def __rsub__(self, other):
+        return ops.sub(other, self)
 
     def __mul__(self, other):
         return ops.mul(self, other)
 
+    def __rmul__(self, other):
+        return ops.mul(self, other)
+
     def __truediv__(self, other):
         return ops.div(self, other)
+
+    def __rtruediv__(self, other):
+        return ops.div(other, self)
 
     def __matmul__(self, other):
         return ops.matmul(self, other)

@@ -1,5 +1,3 @@
-# pursuitnet/nn/linear.py
-
 import numpy as np
 from pursuitnet.tensor import Tensor
 
@@ -17,21 +15,28 @@ class Linear:
         )
 
     def forward(self, input):
-        self.input = input
-        return input @ self.weight + self.bias
+        output = input @ self.weight + self.bias
+        
+        if output.requires_grad:
+            def _backward(grad_output):
+                # Compute gradient for weights and bias
+                if self.weight.requires_grad:
+                    weight_grad = input.data.T @ grad_output
+                    self.weight.backward(weight_grad)
+                
+                if self.bias.requires_grad:
+                    bias_grad = np.sum(grad_output, axis=0)
+                    self.bias.backward(bias_grad)
+                
+                # Compute gradient for input
+                if input.requires_grad:
+                    input_grad = grad_output @ self.weight.data.T
+                    input.backward(input_grad)
+            
+            output._grad_fn = _backward
 
-    def backward(self, grad_output):
-        # Compute gradient for weights and bias
-        weight_grad = self.input.data.T @ grad_output
-        bias_grad = np.sum(grad_output, axis=0)
-        
-        # Use backward method to update gradients
-        self.weight.backward(weight_grad)
-        self.bias.backward(bias_grad)
-        
-        # Return gradient for previous layer
-        return grad_output @ self.weight.data.T
-    
+        return output
+
     def __call__(self, input):
         return self.forward(input)
 

@@ -8,64 +8,55 @@ except ImportError:
     HAS_CUPY = False
 
 from ..autograd import operations
+import pursuitnet as pn
 from pursuitnet.autograd.value import Value
 from pursuitnet.autograd.parameter import Parameter
 
 def add(a, b):
-    if isinstance(b, (int, float)):
-        result = a.__class__(np.add(a.data, b), dtype=a._pursuitnet_dtype, device=a.device)
-    elif isinstance(b, (a.__class__, Parameter)):
-        b_data = b.data if isinstance(b, Parameter) else b.data
-        result = a.__class__(np.add(a.data, b_data), dtype=a._pursuitnet_dtype, device=a.device)
+    if not isinstance(a, pn.Tensor):
+        a, b = b, a  # Ensure 'a' is always a Tensor
+    if not isinstance(b, pn.Tensor):
+        b_data = np.array(b)
     else:
-        raise TypeError(f"Unsupported operand type for +: '{type(a).__name__}' and '{type(b).__name__}'")
+        b_data = b.data
 
-    if a.requires_grad or (isinstance(b, (a.__class__, Parameter)) and b.requires_grad):
-        result.requires_grad = True
-        result.val = Value(result.data, requires_grad=True)
-        def _backward(grad_output):
+    result = pn.Tensor(a.data + b_data, requires_grad=a.requires_grad)
+    if result.requires_grad:
+        def _backward(grad):
             if a.requires_grad:
-                a.backward(grad_output)
-            if isinstance(b, (a.__class__, Parameter)) and b.requires_grad:
-                b.backward(grad_output)
-        result.val.grad_fn = _backward
+                a.backward(grad)
+            if isinstance(b, pn.Tensor) and b.requires_grad:
+                b.backward(grad)
+        result._grad_fn = _backward
     return result
 
 def mul(a, b):
-    if isinstance(b, (int, float)):
-        result = a.__class__(np.multiply(a.data, b), dtype=a._pursuitnet_dtype, device=a.device)
-    elif isinstance(b, a.__class__):
-        result = a.__class__(np.multiply(a.data, b.data), dtype=a._pursuitnet_dtype, device=a.device)
+    if not isinstance(a, pn.Tensor):
+        a, b = b, a  # Ensure 'a' is always a Tensor
+    if not isinstance(b, pn.Tensor):
+        b_data = np.array(b)
     else:
-        raise TypeError(f"Unsupported operand type for *: '{type(a).__name__}' and '{type(b).__name__}'")
+        b_data = b.data
 
-    if a.requires_grad or (isinstance(b, a.__class__) and b.requires_grad):
-        result.requires_grad = True
-        result.val = Value(result.data, requires_grad=True)
-        def _backward(grad_output):
+    result = pn.Tensor(a.data * b_data, requires_grad=a.requires_grad)
+    if result.requires_grad:
+        def _backward(grad):
             if a.requires_grad:
-                a.backward(grad_output * (b.data if isinstance(b, a.__class__) else b))
-            if isinstance(b, a.__class__) and b.requires_grad:
-                b.backward(grad_output * a.data)
-        result.val.grad_fn = _backward
+                a.backward(grad * b_data)
+            if isinstance(b, pn.Tensor) and b.requires_grad:
+                b.backward(grad * a.data)
+        result._grad_fn = _backward
     return result
 
 def matmul(a, b):
-    if not isinstance(b, a.__class__):
-        raise TypeError("Matrix multiplication is only supported between Tensors")
-    result = a.__class__(np.matmul(a.data, b.data), dtype=a._pursuitnet_dtype, device=a.device)
-    if a.requires_grad or b.requires_grad:
-        result.requires_grad = True
-        result.val = Value(result.data, requires_grad=True)
-        def _backward(grad_output):
-            # Ensure grad_output is at least 2D
-            if grad_output.ndim == 0:
-                grad_output = grad_output * np.ones_like(result.data)
+    result = pn.Tensor(np.matmul(a.data, b.data), requires_grad=(a.requires_grad or b.requires_grad))
+    if result.requires_grad:
+        def _backward(grad):
             if a.requires_grad:
-                a.backward(np.matmul(grad_output, b.data.T))
+                a.backward(np.matmul(grad, b.data.T))
             if b.requires_grad:
-                b.backward(np.matmul(a.data.T, grad_output))
-        result.val.grad_fn = _backward
+                b.backward(np.matmul(a.data.T, grad))
+        result._grad_fn = _backward
     return result
 
 def div(a, b):
