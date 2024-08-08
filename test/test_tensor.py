@@ -24,13 +24,13 @@ class TestCPUTensor(unittest.TestCase):
         self.assertIsInstance(self.cpu_tensor, pn.Tensor)
 
     def test_dtype(self):
-        self.assertEqual(self.cpu_tensor.dtype, pn.float32)
+        self.assertEqual(self.cpu_tensor._pursuitnet_dtype, pn.float32)
 
     def test_device(self):
         self.assertEqual(self.cpu_tensor.device, 'cpu')
 
     def test_shape(self):
-        self.assertEqual(str(self.cpu_tensor.shape), 'pursuitnet.Size([2, 2])')
+        self.assertEqual(self.cpu_tensor.shape, (2, 2))
 
     def test_indexing(self):
         self.assertEqual(self.cpu_tensor[0, 1].data, 2)
@@ -64,12 +64,12 @@ class TestCPUTensor(unittest.TestCase):
         self.assertEqual(self.cpu_tensor.min().data, 1)
 
     def test_reshape(self):
-        reshaped = self.cpu_tensor.reshape((1, 4))
-        self.assertEqual(str(reshaped.shape), 'pursuitnet.Size([1, 4])')
+        reshaped = self.cpu_tensor.reshape(1, 4)
+        self.assertEqual(reshaped.shape, (1, 4))
 
     def test_transpose(self):
         transposed = self.cpu_tensor.transpose()
-        self.assertEqual(str(transposed.shape), 'pursuitnet.Size([2, 2])')
+        self.assertEqual(transposed.shape, (2, 2))
         self.assertTrue(np.array_equal(transposed.data, np.array([[1, 3], [2, 4]])))
 
     def test_matmul(self):
@@ -91,13 +91,13 @@ class TestCPUTensor(unittest.TestCase):
 class TestGPUTensor(unittest.TestCase):
     def setUp(self):
         self.data = [[1, 2], [3, 4]]
-        self.gpu_tensor = pn.Tensor(self.data, dtype=np.float32, device='gpu')
+        self.gpu_tensor = pn.Tensor(self.data, dtype=pn.float32, device='gpu')
 
     def test_creation(self):
         self.assertIsInstance(self.gpu_tensor, pn.Tensor)
 
     def test_dtype(self):
-        self.assertEqual(self.gpu_tensor.dtype, pn.float32)
+        self.assertEqual(self.gpu_tensor._pursuitnet_dtype, pn.float32)
 
     def test_device(self):
         self.assertEqual(self.gpu_tensor.device, 'gpu')
@@ -112,16 +112,10 @@ class TestGPUTensor(unittest.TestCase):
     def test_indexing(self):
         self.assertEqual(self.gpu_tensor[1, 0].data, 3)
 
-    # Add more GPU-specific tests here...
-
 class TestTensorRepr(unittest.TestCase):
     def assert_repr_match(self, pn_tensor, pt_tensor):
         pn_repr = repr(pn_tensor)
-        pt_repr = repr(pt_tensor)
-        
-        # Replace 'tensor' with 'Tensor' and 'torch' with 'pursuitnet'
-        pt_repr = pt_repr.replace('tensor', 'Tensor').replace('torch', 'pursuitnet')
-        
+        pt_repr = repr(pt_tensor).replace('tensor', 'Tensor').replace('torch', 'pursuitnet')
         self.assertEqual(pn_repr, pt_repr)
 
     def test_float32_no_decimal(self):
@@ -182,19 +176,19 @@ class TestTensorSize(unittest.TestCase):
     def test_tensor_shape(self):
         data = [[1, 2], [3, 4]]
         tensor = pn.Tensor(data, dtype=pn.float32)
-        self.assertEqual(str(tensor.shape), 'pursuitnet.Size([2, 2])')
+        self.assertEqual(tensor.shape, (2, 2))
 
     def test_reshape_tensor(self):
         data = [[1, 2], [3, 4]]
         tensor = pn.Tensor(data, dtype=pn.float32)
         reshaped = tensor.reshape(1, 4)
-        self.assertEqual(str(reshaped.shape), 'pursuitnet.Size([1, 4])')
+        self.assertEqual(reshaped.shape, (1, 4))
 
     def test_transpose_tensor(self):
         data = [[1, 2], [3, 4]]
         tensor = pn.Tensor(data, dtype=pn.float32)
         transposed = tensor.transpose()
-        self.assertEqual(str(transposed.shape), 'pursuitnet.Size([2, 2])')
+        self.assertEqual(transposed.shape, (2, 2))
 
 class TestGradients(unittest.TestCase):
     def assert_close(self, a, b, rtol=1e-5, atol=1e-8):
@@ -202,11 +196,11 @@ class TestGradients(unittest.TestCase):
             if x is None:
                 return None
             if isinstance(x, pn.Tensor):
-                return x.data.tolist() if x.data is not None else None
+                return x.data.flatten().tolist() if x.data is not None else None
             elif isinstance(x, torch.Tensor):
-                return x.detach().cpu().numpy().tolist()
+                return x.detach().cpu().numpy().flatten().tolist()
             elif isinstance(x, np.ndarray):
-                return x.tolist()
+                return x.flatten().tolist()
             else:
                 return list(x)
 
@@ -215,44 +209,81 @@ class TestGradients(unittest.TestCase):
 
         if a_list is None and b_list is None:
             return
-        
-        self.assertIsNotNone(a_list, "First argument is None")
-        self.assertIsNotNone(b_list, "Second argument is None")
 
-        self.assertEqual(len(a_list), len(b_list), "Arrays have different lengths")
+        if a_list is None or b_list is None:
+            raise AssertionError("One of the gradients is None while the other is not")
 
         for a_val, b_val in zip(a_list, b_list):
-            if isinstance(a_val, (list, tuple)) and isinstance(b_val, (list, tuple)):
-                self.assert_close(a_val, b_val, rtol, atol)
-            else:
-                self.assertAlmostEqual(a_val, b_val, delta=max(rtol * abs(b_val), atol),
-                                    msg=f"Values not close: {a_val} != {b_val}")
-                
-    def test_requires_grad(self):
-        pn_tensor = pn.Tensor([1.0, 2.0, 3.0], requires_grad=True)
-        pt_tensor = torch.tensor([1.0, 2.0, 3.0], requires_grad=True)
+            self.assertAlmostEqual(a_val, b_val, delta=max(rtol * abs(b_val), atol))
+
+    def setUp(self):
+        self.pn_x = pn.Tensor([1.0, 2.0, 3.0], requires_grad=True)
+        self.pn_y = pn.Tensor([4.0, 5.0, 6.0], requires_grad=True)
+        self.pt_x = torch.tensor([1.0, 2.0, 3.0], requires_grad=True)
+        self.pt_y = torch.tensor([4.0, 5.0, 6.0], requires_grad=True)
+
+    def test_addition_backward(self):
+        pn_x = pn.Tensor([1.0, 2.0, 3.0], requires_grad=True)
+        pn_y = pn.Tensor([4.0, 5.0, 6.0], requires_grad=True)
+        pt_x = torch.tensor([1.0, 2.0, 3.0], requires_grad=True)
+        pt_y = torch.tensor([4.0, 5.0, 6.0], requires_grad=True)
         
-        self.assertTrue(pn_tensor.requires_grad)
-        self.assertTrue(pt_tensor.requires_grad)
+        pn_z = (pn_x + pn_y).sum()
+        pt_z = (pt_x + pt_y).sum()
+        
+        print("Before backward:")
+        print("pn_x.grad:", pn_x.grad)
+        print("pn_y.grad:", pn_y.grad)
+        
+        pn_z.backward()
+        pt_z.backward()
+        
+        print("After backward:")
+        print("pn_x.grad:", pn_x.grad)
+        print("pn_y.grad:", pn_y.grad)
+        print("pt_x.grad:", pt_x.grad)
+        print("pt_y.grad:", pt_y.grad)
+        
+        self.assert_close(pn_x.grad, pt_x.grad)
+        self.assert_close(pn_y.grad, pt_y.grad)
+
+    def test_complex_computation(self):
+        pn_z = (self.pn_x * self.pn_y + self.pn_x @ self.pn_y).sum()
+        pt_z = (self.pt_x * self.pt_y + self.pt_x @ self.pt_y).sum()
+        pn_z.backward()
+        pt_z.backward()
+        self.assert_close(self.pn_x.grad, self.pt_x.grad)
+        self.assert_close(self.pn_y.grad, self.pt_y.grad)
 
     def test_grad_none_initially(self):
         pn_tensor = pn.Tensor([1.0, 2.0, 3.0], requires_grad=True)
-        pt_tensor = torch.tensor([1.0, 2.0, 3.0], requires_grad=True)
-        
         self.assertIsNone(pn_tensor.grad)
-        self.assertIsNone(pt_tensor.grad)
+
+    def test_matmul_backward(self):
+        pn_z = (self.pn_x @ self.pn_y).sum()
+        pt_z = (self.pt_x @ self.pt_y).sum()
+        pn_z.backward()
+        pt_z.backward()
+        self.assert_close(self.pn_x.grad, self.pt_x.grad)
+        self.assert_close(self.pn_y.grad, self.pt_y.grad)
+
+    def test_multiplication_backward(self):
+        pn_z = (self.pn_x * self.pn_y).sum()
+        pt_z = (self.pt_x * self.pt_y).sum()
+        pn_z.backward()
+        pt_z.backward()
+        self.assert_close(self.pn_x.grad, self.pt_x.grad)
+        self.assert_close(self.pn_y.grad, self.pt_y.grad)
 
     def test_simple_backward(self):
         pn_tensor = pn.Tensor([1.0, 2.0, 3.0], requires_grad=True)
         pt_tensor = torch.tensor([1.0, 2.0, 3.0], requires_grad=True)
-        
         pn_result = pn_tensor.sum()
         pt_result = pt_tensor.sum()
-        
         pn_result.backward()
         pt_result.backward()
-        
         self.assert_close(pn_tensor.grad, pt_tensor.grad)
+
 
     def test_addition_backward(self):
         pn_x = pn.Tensor([1.0, 2.0, 3.0], requires_grad=True)

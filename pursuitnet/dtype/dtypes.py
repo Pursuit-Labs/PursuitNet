@@ -1,3 +1,5 @@
+# pursuitnet/dtype/dtypes.py
+
 import numpy as np
 
 class dtype:
@@ -7,6 +9,9 @@ class dtype:
 
     def __repr__(self):
         return f"pursuitnet.{self.__name__}"
+
+    def __call__(self):
+        return self.numpy_dtype
 
 # Floating-point types
 float32 = dtype(np.float32, 'float32')

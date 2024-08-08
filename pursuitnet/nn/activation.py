@@ -21,8 +21,12 @@ class ReLU:
         return output
 
     def backward(self, grad_output):
-        # Backward pass through ReLU
+        # Compute gradient
         grad_input = grad_output * (self.input.data > 0)
+        
+        # Propagate gradient to input tensor
+        self.input.backward(grad_input)
+        
         return grad_input
     
     def __call__(self, input: Tensor) -> Tensor:

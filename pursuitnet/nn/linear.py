@@ -22,8 +22,12 @@ class Linear:
 
     def backward(self, grad_output):
         # Compute gradient for weights and bias
-        self.weight.grad = self.input.data.T @ grad_output
-        self.bias.grad = np.sum(grad_output, axis=0)
+        weight_grad = self.input.data.T @ grad_output
+        bias_grad = np.sum(grad_output, axis=0)
+        
+        # Use backward method to update gradients
+        self.weight.backward(weight_grad)
+        self.bias.backward(bias_grad)
         
         # Return gradient for previous layer
         return grad_output @ self.weight.data.T
