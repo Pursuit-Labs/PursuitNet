@@ -16,6 +16,9 @@ class Tensor:
     @property
     def shape(self):
         return self.data.shape
+    
+    def __len__(self):
+        return len(self.data)
 
     def zero_grad(self):
         if self.requires_grad:
@@ -55,6 +58,11 @@ class Tensor:
 
     def __getitem__(self, key):
         return Tensor(self.data[key], dtype=self._pursuitnet_dtype, device=self.device, requires_grad=self.requires_grad)
+
+    def item(self):
+        if self.data.size != 1:
+            raise ValueError("Only one element tensors can be converted to a Python scalar")
+        return self.data.item()
 
     def __repr__(self):
         def format_element(x):
