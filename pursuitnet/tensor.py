@@ -7,11 +7,19 @@ class Tensor:
     def __init__(self, data, dtype=pn_dtype.float32, device='cpu', requires_grad=False):
         self.device = device
         self._pursuitnet_dtype = dtype
-        self.data = np.array(data, dtype=dtype())
+
+        if dtype is None:
+            self.data = np.array(data)
+        elif dtype == bool:
+            self.data = np.array(data, dtype=bool)
+        else:
+            self.data = np.array(data, dtype=dtype())
+
         self.requires_grad = requires_grad
         self.grad = None if requires_grad else None
         self._backward_hooks = []
         self._grad_fn = None
+        
 
     @property
     def shape(self):
@@ -59,9 +67,13 @@ class Tensor:
     def __getitem__(self, key):
         return Tensor(self.data[key], dtype=self._pursuitnet_dtype, device=self.device, requires_grad=self.requires_grad)
 
+    def argmax(self, axis=None):
+        result = np.argmax(self.data, axis=axis)
+        return Tensor(result, dtype=self._pursuitnet_dtype, device=self.device, requires_grad=False)
+    
     def item(self):
         if self.data.size != 1:
-            raise ValueError("Only one element tensors can be converted to a Python scalar")
+            raise ValueError("Only one element tensors can be converted to Python scalars")
         return self.data.item()
 
     def __repr__(self):
@@ -139,23 +151,56 @@ class Tensor:
         reshaped_data = self.data.reshape(*shape)
         return Tensor(reshaped_data, dtype=self._pursuitnet_dtype, device=self.device, requires_grad=self.requires_grad)
     
-    def sum(self):
-        summed_data = self.data.sum()
-        result = Tensor(summed_data, dtype=self._pursuitnet_dtype, device=self.device, requires_grad=self.requires_grad)
+    def astype(self, dtype):
+        return Tensor(self.data.astype(dtype), dtype=dtype, device=self.device, requires_grad=self.requires_grad)
+
+    def sum(self, axis=None, keepdims=False):
+        if self.data.dtype == bool:
+            summed_data = np.sum(self.data.astype(int), axis=axis, keepdims=keepdims)
+        else:
+            summed_data = np.sum(self.data, axis=axis, keepdims=keepdims)
+        result = Tensor(summed_data, dtype=pn.float32, device=self.device, requires_grad=self.requires_grad)
+        
         if self.requires_grad:
             def _backward(grad):
-                self.backward(grad * np.ones_like(self.data))
-            result.register_hook(_backward)
+                if axis is not None:
+                    grad_shape = list(self.data.shape)
+                    if not keepdims:
+                        for ax in (axis if isinstance(axis, tuple) else (axis,)):
+                            grad_shape[ax] = 1
+                    grad = np.broadcast_to(grad.reshape(grad_shape), self.data.shape)
+                self.backward(grad)
+            result._grad_fn = _backward
+        
         return result
-    
-    def mean(self):
-        mean_data = self.data.mean()
-        result = Tensor(mean_data, dtype=self._pursuitnet_dtype, device=self.device, requires_grad=self.requires_grad)
+
+    def mean(self, axis=None, keepdims=False):
+        if self.data.dtype == bool:
+            mean_data = np.mean(self.data.astype(float), axis=axis, keepdims=keepdims)
+        else:
+            mean_data = np.mean(self.data, axis=axis, keepdims=keepdims)
+        result = Tensor(mean_data, dtype=pn.float32, device=self.device, requires_grad=self.requires_grad)
+        
         if self.requires_grad:
             def _backward(grad):
-                self.backward(grad * np.ones_like(self.data) / self.data.size)
-            result.register_hook(_backward)
+                if axis is not None:
+                    grad_shape = list(self.data.shape)
+                    if not keepdims:
+                        for ax in (axis if isinstance(axis, tuple) else (axis,)):
+                            grad_shape[ax] = 1
+                    grad = np.broadcast_to(grad.reshape(grad_shape), self.data.shape)
+                
+                # Calculate the scaling factor for the gradient
+                if axis is None:
+                    scale = 1 / self.data.size
+                else:
+                    scale = 1 / np.prod([self.data.shape[ax] for ax in (axis if isinstance(axis, tuple) else (axis,))])
+                
+                self.backward(grad * scale)
+            result._grad_fn = _backward
+        
         return result
+
     
     def max(self):
         max_data = self.data.max()
@@ -194,3 +239,36 @@ class Tensor:
     @classmethod
     def random(cls, *shape, dtype=pn_dtype.float32, device='cpu', requires_grad=False):
         return cls(np.random.randn(*shape), dtype=dtype, device=device, requires_grad=requires_grad)
+    
+    def __eq__(self, other):
+        if isinstance(other, Tensor):
+            return Tensor(self.data == other.data, dtype=bool, device=self.device)
+        else:
+            return Tensor(self.data == other, dtype=bool, device=self.device)
+
+    def __ne__(self, other):
+        return ~(self == other)
+
+    def __lt__(self, other):
+        if isinstance(other, Tensor):
+            return Tensor(self.data < other.data, dtype=bool, device=self.device)
+        else:
+            return Tensor(self.data < other, dtype=bool, device=self.device)
+
+    def __le__(self, other):
+        if isinstance(other, Tensor):
+            return Tensor(self.data <= other.data, dtype=bool, device=self.device)
+        else:
+            return Tensor(self.data <= other, dtype=bool, device=self.device)
+
+    def __gt__(self, other):
+        if isinstance(other, Tensor):
+            return Tensor(self.data > other.data, dtype=bool, device=self.device)
+        else:
+            return Tensor(self.data > other, dtype=bool, device=self.device)
+
+    def __ge__(self, other):
+        if isinstance(other, Tensor):
+            return Tensor(self.data >= other.data, dtype=bool, device=self.device)
+        else:
+            return Tensor(self.data >= other, dtype=bool, device=self.device)

@@ -156,16 +156,26 @@ def min(a, axis=None, keepdims=False):
     return result
 
 def mean(a, axis=None, keepdims=False):
-    result = a.__class__(np.mean(a.data, axis=axis, keepdims=keepdims), dtype=a._pursuitnet_dtype, device=a.device)
-    if a.requires_grad:
-        result.requires_grad = True
-        result.val = Value(result.data, requires_grad=True)
-        def _backward(grad_output):
-            shape = np.array(a.data.shape)
-            if axis is not None:
-                shape[axis] = 1
-            a.backward(grad_output / np.prod(shape) * np.ones_like(a.data))
-        result.val.grad_fn = _backward
+    if isinstance(a, pn.Tensor):
+        if a.data.dtype == bool:
+            result_data = np.mean(a.data.astype(float), axis=axis, keepdims=keepdims)
+        else:
+            result_data = np.mean(a.data, axis=axis, keepdims=keepdims)
+        return pn.Tensor(result_data, dtype=a._pursuitnet_dtype, device=a.device)
+    
+    if isinstance(a, bool):
+        return float(a)
+    
+    if not isinstance(a, np.ndarray):
+        a = np.array(a)
+    
+    if a.dtype == bool:
+        a = a.astype(float)
+    
+    if a.size == 0:
+        return 0.0
+    
+    result = np.mean(a, axis=axis, keepdims=keepdims)
     return result
 
 def reshape(a, *shape):
